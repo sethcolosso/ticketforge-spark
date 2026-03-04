@@ -2,6 +2,9 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Zap, Shield, BarChart3, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EventCard from "@/components/EventCard";
+import FloatingTickets from "@/components/FloatingTickets";
+import SponsorSection from "@/components/SponsorSection";
+import LifetimeTicketBanner from "@/components/LifetimeTicketBanner";
 import { getFeaturedEvents } from "@/data/events";
 import heroBg from "@/assets/hero-bg.png";
 
@@ -64,8 +67,14 @@ const Index = () => {
               </Button>
             </Link>
           </div>
+
+          {/* Floating Ticket Display */}
+          <FloatingTickets />
         </div>
       </section>
+
+      {/* Sponsor Logos */}
+      <SponsorSection />
 
       {/* Features */}
       <section className="py-20 bg-card">
@@ -95,6 +104,9 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Lifetime Ticket Banner */}
+      <LifetimeTicketBanner />
 
       {/* Featured Events */}
       <section className="py-20">
