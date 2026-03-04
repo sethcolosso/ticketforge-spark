@@ -36,9 +36,9 @@ const Footer = () => (
         <div>
           <h4 className="text-sm font-semibold mb-3">Legal</h4>
           <div className="flex flex-col gap-2">
-            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
-            <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>
-            <Link to="/refund" className="text-sm text-muted-foreground hover:text-primary transition-colors">Refund Policy</Link>
+            <span className="text-sm text-muted-foreground">Privacy Policy</span>
+            <span className="text-sm text-muted-foreground">Terms of Service</span>
+            <span className="text-sm text-muted-foreground">Cookie Policy</span>
           </div>
         </div>
       </div>

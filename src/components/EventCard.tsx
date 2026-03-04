@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { CalendarDays, MapPin, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import StatusBadge from "@/components/StatusBadge";
 import type { Event } from "@/data/events";
 
 const EventCard = ({ event }: { event: Event }) => {
@@ -11,7 +10,6 @@ const EventCard = ({ event }: { event: Event }) => {
     year: "numeric",
   });
   const minPrice = Math.min(...event.tickets.map((t) => t.price));
-  const minOriginal = event.tickets.find((t) => t.originalPrice)?.originalPrice;
 
   return (
     <Link
@@ -31,7 +29,9 @@ const EventCard = ({ event }: { event: Event }) => {
           <Badge variant="secondary" className="text-xs bg-secondary/80 backdrop-blur-sm">
             {event.category}
           </Badge>
-          <StatusBadge status={event.status} />
+          {event.soldOut && (
+            <Badge variant="destructive" className="text-xs">Sold Out</Badge>
+          )}
         </div>
         {event.featured && (
           <div className="absolute top-3 right-3">
@@ -58,18 +58,9 @@ const EventCard = ({ event }: { event: Event }) => {
           </div>
         </div>
         <div className="flex items-center justify-between pt-2 border-t border-border">
-          <div className="flex items-center gap-2">
-            {event.soldOut ? (
-              <span className="text-sm text-muted-foreground">Sold out</span>
-            ) : (
-              <>
-                <span className="text-sm font-heading font-bold text-primary">From ${minPrice}</span>
-                {minOriginal && (
-                  <span className="text-xs text-muted-foreground line-through">${minOriginal}</span>
-                )}
-              </>
-            )}
-          </div>
+          <span className="text-sm text-muted-foreground">
+            {event.soldOut ? "Sold out" : `From $${minPrice}`}
+          </span>
           <span className="text-sm font-medium text-primary group-hover:underline">
             {event.soldOut ? "Join Waitlist" : "Get Tickets →"}
           </span>

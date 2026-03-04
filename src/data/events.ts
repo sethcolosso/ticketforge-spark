@@ -6,10 +6,8 @@ export interface TicketType {
   id: string;
   name: string;
   price: number;
-  originalPrice?: number; // for discount display
   description: string;
   available: number;
-  depositEnabled?: boolean; // 50% deposit option
 }
 
 export interface Event {
@@ -27,8 +25,6 @@ export interface Event {
   tickets: TicketType[];
   featured: boolean;
   soldOut: boolean;
-  status: "available" | "limited" | "sold-out" | "waitlist";
-  waitlistCount?: number;
 }
 
 export const events: Event[] = [
@@ -46,11 +42,10 @@ export const events: Event[] = [
     category: "Music",
     featured: true,
     soldOut: false,
-    status: "available",
     tickets: [
-      { id: "t1", name: "General Admission", price: 23, originalPrice: 45, description: "Access to all stages and areas", available: 200, depositEnabled: true },
-      { id: "t2", name: "VIP Experience", price: 60, originalPrice: 120, description: "Priority entry, VIP lounge, complimentary drinks", available: 50, depositEnabled: true },
-      { id: "t3", name: "Artist Meet & Greet", price: 125, originalPrice: 250, description: "VIP + backstage access and artist meet & greet", available: 15, depositEnabled: true },
+      { id: "t1", name: "General Admission", price: 45, description: "Access to all stages and areas", available: 200 },
+      { id: "t2", name: "VIP Experience", price: 120, description: "Priority entry, VIP lounge, complimentary drinks", available: 50 },
+      { id: "t3", name: "Artist Meet & Greet", price: 250, description: "VIP + backstage access and artist meet & greet", available: 15 },
     ],
   },
   {
@@ -67,11 +62,10 @@ export const events: Event[] = [
     category: "Festival",
     featured: true,
     soldOut: false,
-    status: "available",
     tickets: [
-      { id: "t4", name: "Day Pass", price: 33, originalPrice: 65, description: "Full day access to all stages and areas", available: 500, depositEnabled: true },
-      { id: "t5", name: "Weekend Pass", price: 55, originalPrice: 110, description: "Access for both Saturday and Sunday", available: 300, depositEnabled: true },
-      { id: "t6", name: "VIP Weekend", price: 113, originalPrice: 225, description: "Weekend access with VIP areas and premium viewing", available: 75, depositEnabled: true },
+      { id: "t4", name: "Day Pass", price: 65, description: "Full day access to all stages and areas", available: 500 },
+      { id: "t5", name: "Weekend Pass", price: 110, description: "Access for both Saturday and Sunday", available: 300 },
+      { id: "t6", name: "VIP Weekend", price: 225, description: "Weekend access with VIP areas and premium viewing", available: 75 },
     ],
   },
   {
@@ -88,10 +82,9 @@ export const events: Event[] = [
     category: "Art",
     featured: false,
     soldOut: false,
-    status: "limited",
     tickets: [
-      { id: "t7", name: "General Entry", price: 15, originalPrice: 30, description: "Gallery access and performances", available: 12 },
-      { id: "t8", name: "Collector's Pass", price: 43, originalPrice: 85, description: "Early access, catalog, and artist reception", available: 5 },
+      { id: "t7", name: "General Entry", price: 30, description: "Gallery access and performances", available: 150 },
+      { id: "t8", name: "Collector's Pass", price: 85, description: "Early access, catalog, and artist reception", available: 40 },
     ],
   },
   {
@@ -108,10 +101,9 @@ export const events: Event[] = [
     category: "Music",
     featured: false,
     soldOut: false,
-    status: "available",
     tickets: [
-      { id: "t9", name: "General Admission", price: 18, originalPrice: 35, description: "Standing room access", available: 300 },
-      { id: "t10", name: "Front Row VIP", price: 48, originalPrice: 95, description: "Reserved front section + merch pack", available: 30 },
+      { id: "t9", name: "General Admission", price: 35, description: "Standing room access", available: 300 },
+      { id: "t10", name: "Front Row VIP", price: 95, description: "Reserved front section + merch pack", available: 30 },
     ],
   },
   {
@@ -128,11 +120,9 @@ export const events: Event[] = [
     category: "Music",
     featured: true,
     soldOut: true,
-    status: "waitlist",
-    waitlistCount: 342,
     tickets: [
-      { id: "t11", name: "Sunset Pass", price: 28, originalPrice: 55, description: "Rooftop access from 5 PM", available: 0 },
-      { id: "t12", name: "Premium Sunset", price: 75, originalPrice: 150, description: "Reserved daybed, bottle service", available: 0 },
+      { id: "t11", name: "Sunset Pass", price: 55, description: "Rooftop access from 5 PM", available: 0 },
+      { id: "t12", name: "Premium Sunset", price: 150, description: "Reserved daybed, bottle service", available: 0 },
     ],
   },
   {
@@ -149,10 +139,9 @@ export const events: Event[] = [
     category: "Music",
     featured: false,
     soldOut: false,
-    status: "available",
     tickets: [
-      { id: "t13", name: "Pit Access", price: 13, originalPrice: 25, description: "General admission standing", available: 400 },
-      { id: "t14", name: "Balcony Reserved", price: 23, originalPrice: 45, description: "Seated balcony with drink ticket", available: 80 },
+      { id: "t13", name: "Pit Access", price: 25, description: "General admission standing", available: 400 },
+      { id: "t14", name: "Balcony Reserved", price: 45, description: "Seated balcony with drink ticket", available: 80 },
     ],
   },
 ];
