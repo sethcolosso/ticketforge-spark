@@ -1,8 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, Ticket, User, LogOut, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { events } from "@/data/events";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 // Mock purchased tickets for demo
 const purchasedTickets = [
@@ -11,6 +13,30 @@ const purchasedTickets = [
 ];
 
 const Dashboard = () => {
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) navigate("/login");
+  }, [loading, user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="py-24 text-center text-muted-foreground">Loading...</div>
+    );
+  }
+
+  if (!user) return null;
+
+  const meta = user.user_metadata || {};
+  const displayName = [meta.first_name, meta.last_name].filter(Boolean).join(" ") || user.email?.split("@")[0] || "User";
+  const displayEmail = user.email || "";
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   return (
     <div className="py-12">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -21,15 +47,13 @@ const Dashboard = () => {
               <User className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-heading font-bold">Jane Doe</h1>
-              <p className="text-sm text-muted-foreground">jane@example.com</p>
+              <h1 className="text-2xl font-heading font-bold">{displayName}</h1>
+              <p className="text-sm text-muted-foreground">{displayEmail}</p>
             </div>
           </div>
-          <Link to="/">
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              <LogOut className="h-4 w-4 mr-2" /> Log out
-            </Button>
-          </Link>
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" /> Log out
+          </Button>
         </div>
 
         {/* Stats */}
