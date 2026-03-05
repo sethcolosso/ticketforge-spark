@@ -1,19 +1,21 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, Ticket, User } from "lucide-react";
+import { Menu, X, Ticket, User, Store, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-
-const navLinks = [
-  { to: "/", label: "Home" },
-  { to: "/events", label: "Events" },
-  { to: "/pricing", label: "Pricing" },
-];
+import { useRoles } from "@/hooks/useRoles";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
+  const { isSeller, isAdmin } = useRoles();
+
+  const navLinks = [
+    { to: "/", label: "Home" },
+    { to: "/events", label: "Events" },
+    { to: "/pricing", label: "Pricing" },
+  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -24,14 +26,11 @@ const Navbar = () => {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
+          {navLinks.map(link => (
+            <Link key={link.to} to={link.to}
               className={`text-sm font-medium transition-colors hover:text-primary ${
                 location.pathname === link.to ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
+              }`}>
               {link.label}
             </Link>
           ))}
@@ -39,11 +38,27 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center gap-3">
           {user ? (
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <User className="h-4 w-4" /> Dashboard
-              </Button>
-            </Link>
+            <>
+              {isSeller && (
+                <Link to="/seller">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                    <Store className="h-4 w-4" /> Seller
+                  </Button>
+                </Link>
+              )}
+              {isAdmin && (
+                <Link to="/admin">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                    <Shield className="h-4 w-4" /> Admin
+                  </Button>
+                </Link>
+              )}
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="h-4 w-4" /> Dashboard
+                </Button>
+              </Link>
+            </>
           ) : (
             <>
               <Link to="/login">
@@ -64,17 +79,29 @@ const Navbar = () => {
       {mobileOpen && (
         <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-xl">
           <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
-            {navLinks.map((link) => (
+            {navLinks.map(link => (
               <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)}
                 className={`text-sm font-medium py-2 transition-colors ${location.pathname === link.to ? "text-primary" : "text-muted-foreground"}`}>
                 {link.label}
               </Link>
             ))}
-            <div className="flex gap-3 pt-2 border-t border-border">
+            <div className="flex gap-3 pt-2 border-t border-border flex-wrap">
               {user ? (
-                <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full gap-2"><User className="h-4 w-4" /> Dashboard</Button>
-                </Link>
+                <>
+                  <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full gap-2"><User className="h-4 w-4" /> Dashboard</Button>
+                  </Link>
+                  {isSeller && (
+                    <Link to="/seller" onClick={() => setMobileOpen(false)} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full gap-2"><Store className="h-4 w-4" /> Seller</Button>
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <Link to="/admin" onClick={() => setMobileOpen(false)} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full gap-2"><Shield className="h-4 w-4" /> Admin</Button>
+                    </Link>
+                  )}
+                </>
               ) : (
                 <>
                   <Link to="/login" onClick={() => setMobileOpen(false)} className="flex-1">
