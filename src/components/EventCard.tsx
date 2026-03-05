@@ -1,15 +1,18 @@
 import { Link } from "react-router-dom";
 import { CalendarDays, MapPin, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Event } from "@/data/events";
+import type { DbEvent } from "@/types/database";
 
-const EventCard = ({ event }: { event: Event }) => {
+const EventCard = ({ event }: { event: DbEvent }) => {
   const formattedDate = new Date(event.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  const minPrice = Math.min(...event.tickets.map((t) => t.price));
+
+  const tickets = event.ticket_types || [];
+  const minPrice = tickets.length > 0 ? Math.min(...tickets.map(t => Number(t.price))) : 0;
+  const soldOut = tickets.length > 0 && tickets.every(t => t.quantity_sold >= t.quantity_available);
 
   return (
     <Link
@@ -17,23 +20,18 @@ const EventCard = ({ event }: { event: Event }) => {
       className="group block rounded-lg overflow-hidden border border-border bg-card hover:border-primary/40 transition-all duration-300 hover:box-glow"
     >
       {/* Image */}
-      <div className="relative aspect-[16/10] overflow-hidden">
-        <img
-          src={event.image}
-          alt={event.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-        />
+      <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
+        {event.image_url ? (
+          <img src={event.image_url} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No Image</div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-card/90 via-transparent to-transparent" />
         <div className="absolute top-3 left-3 flex gap-2">
-          <Badge variant="secondary" className="text-xs bg-secondary/80 backdrop-blur-sm">
-            {event.category}
-          </Badge>
-          {event.soldOut && (
-            <Badge variant="destructive" className="text-xs">Sold Out</Badge>
-          )}
+          <Badge variant="secondary" className="text-xs bg-secondary/80 backdrop-blur-sm">{event.category}</Badge>
+          {soldOut && <Badge variant="destructive" className="text-xs">Sold Out</Badge>}
         </div>
-        {event.featured && (
+        {event.is_featured && (
           <div className="absolute top-3 right-3">
             <Badge className="text-xs bg-primary text-primary-foreground">Featured</Badge>
           </div>
@@ -49,8 +47,12 @@ const EventCard = ({ event }: { event: Event }) => {
           <div className="flex items-center gap-2">
             <CalendarDays className="h-3.5 w-3.5 text-primary" />
             <span>{formattedDate}</span>
-            <Clock className="h-3.5 w-3.5 text-primary ml-2" />
-            <span>{event.time}</span>
+            {event.time && (
+              <>
+                <Clock className="h-3.5 w-3.5 text-primary ml-2" />
+                <span>{event.time}</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5 text-primary" />
@@ -59,10 +61,10 @@ const EventCard = ({ event }: { event: Event }) => {
         </div>
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <span className="text-sm text-muted-foreground">
-            {event.soldOut ? "Sold out" : `From $${minPrice}`}
+            {soldOut ? "Sold out" : tickets.length > 0 ? `From $${minPrice}` : "Free"}
           </span>
           <span className="text-sm font-medium text-primary group-hover:underline">
-            {event.soldOut ? "Join Waitlist" : "Get Tickets →"}
+            {soldOut ? "Join Waitlist" : "Get Tickets →"}
           </span>
         </div>
       </div>

@@ -12,6 +12,7 @@ const Register = () => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -27,13 +28,24 @@ const Register = () => {
         emailRedirectTo: window.location.origin,
       },
     });
-    setLoading(false);
+    
     if (error) {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Account created!", description: "Welcome to URBANPUNK. Check your email to confirm." });
-      navigate("/dashboard");
+      setLoading(false);
+      return;
     }
+
+    // If user chose seller role, add it
+    if (role === 'seller' && signUpData.user) {
+      await (supabase as any).from('user_roles').insert({
+        user_id: signUpData.user.id,
+        role: 'seller',
+      });
+    }
+
+    setLoading(false);
+    toast({ title: "Account created!", description: "Welcome to URBANPUNK. Check your email to confirm." });
+    navigate("/dashboard");
   };
 
   return (
@@ -66,6 +78,23 @@ const Register = () => {
           <div>
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required placeholder="••••••••" minLength={8} value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+          <div>
+            <Label>I want to</Label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button type="button" onClick={() => setRole('buyer')}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  role === 'buyer' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}>
+                🎟️ Buy Tickets
+              </button>
+              <button type="button" onClick={() => setRole('seller')}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  role === 'seller' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}>
+                🎪 Sell Tickets
+              </button>
+            </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create Account"}
