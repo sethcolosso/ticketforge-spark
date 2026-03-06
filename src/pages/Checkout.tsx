@@ -6,18 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-
-interface CheckoutTicket {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
+import { createTicketOrder } from "@/lib/ticketOrders";
 
 interface CheckoutData {
-  event: { id: string; title: string; date: string; venue: string; location: string; image_url?: string };
-  tickets: CheckoutTicket[];
+  event: { id: string; slug: string; title: string; date: string; venue: string; location: string; image?: string };
+  tickets: { name: string; price: number; quantity: number }[];
   total: number;
 }
 
@@ -25,27 +18,36 @@ const Checkout = () => {
   const [data, setData] = useState<CheckoutData | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [orderCode, setOrderCode] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   useEffect(() => {
     const raw = sessionStorage.getItem("checkout");
-    if (raw) setData(JSON.parse(raw));
+    if (raw) {
+      setData(JSON.parse(raw));
+    }
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      toast({ title: "Please sign in", description: "You need an account to checkout.", variant: "destructive" });
+    if (!authLoading && !user) {
+      toast({ title: "Login Required", description: "Please sign in to complete your purchase." });
       navigate("/login");
     }
-  }, [user, navigate, toast]);
+  }, [authLoading, user, navigate, toast]);
+
+  if (authLoading) {
+    return <div className="py-24 text-center text-muted-foreground">Loading checkout...</div>;
+  }
 
   if (!data) {
     return (
       <div className="container mx-auto px-4 py-20 text-center">
         <h1 className="text-2xl font-heading font-bold mb-4">No Items in Cart</h1>
-        <Link to="/events"><Button variant="outline">Browse Events</Button></Link>
+        <Link to="/events">
+          <Button variant="outline">Browse Events</Button>
+        </Link>
       </div>
     );
   }
@@ -58,10 +60,15 @@ const Checkout = () => {
         <p className="text-muted-foreground mb-2">
           Your tickets for <span className="text-foreground font-medium">{data.event.title}</span> have been reserved.
         </p>
-        <p className="text-sm text-muted-foreground mb-8">A confirmation has been sent to your email.</p>
+        <p className="text-sm text-muted-foreground mb-8">A confirmation email will be sent shortly.</p>
+        {orderCode && <p className="text-sm text-muted-foreground mb-8">Order ID: <span className="font-mono text-foreground">{orderCode}</span></p>}
         <div className="flex gap-4 justify-center">
-          <Link to="/dashboard"><Button>View My Tickets</Button></Link>
-          <Link to="/events"><Button variant="outline">Browse More Events</Button></Link>
+          <Link to="/dashboard">
+            <Button>View My Tickets</Button>
+          </Link>
+          <Link to="/events">
+            <Button variant="outline">Browse More Events</Button>
+          </Link>
         </div>
       </div>
     );
@@ -69,67 +76,29 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast({ title: "Login Required", description: "Please sign in to complete your purchase." });
+      navigate("/login");
+      return;
+    }
+
     setLoading(true);
 
-    // Create order in database
-    const { data: order, error: orderError } = await (supabase as any)
-      .from('orders')
-      .insert({
-        user_id: user.id,
-        event_id: data.event.id,
-        total_amount: data.total,
-        status: 'confirmed',
-      })
-      .select()
-      .single();
-
-    if (orderError || !order) {
-      toast({ title: "Error", description: orderError?.message || "Failed to create order", variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
-    // Create order items
-    const items = data.tickets.map(t => ({
-      order_id: order.id,
-      ticket_type_id: t.id,
-      quantity: t.quantity,
-      unit_price: t.price,
-    }));
-
-    const { error: itemsError } = await (supabase as any)
-      .from('order_items')
-      .insert(items);
-
-    if (itemsError) {
-      toast({ title: "Error", description: itemsError.message, variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
-    // Send confirmation email via edge function
     try {
-      await supabase.functions.invoke('send-ticket-email', {
-        body: {
-          orderId: order.id,
-          userEmail: user.email,
-          eventTitle: data.event.title,
-          eventDate: data.event.date,
-          eventVenue: `${data.event.venue}, ${data.event.location}`,
-          tickets: data.tickets,
-          total: data.total,
-        },
+      const order = await createTicketOrder(user.id, data);
+      setOrderCode(order.order_code);
+      setLoading(false);
+      setSubmitted(true);
+      sessionStorage.removeItem("checkout");
+      toast({ title: "Payment Successful!", description: "Your tickets have been confirmed." });
+    } catch (error) {
+      setLoading(false);
+      toast({
+        title: "Checkout Failed",
+        description: error instanceof Error ? error.message : "Unable to complete your purchase.",
+        variant: "destructive",
       });
-    } catch {
-      // Email sending is best-effort
-      console.log('Email sending skipped');
     }
-
-    setLoading(false);
-    setSubmitted(true);
-    sessionStorage.removeItem("checkout");
-    toast({ title: "Payment Successful!", description: "Your tickets have been confirmed." });
   };
 
   const fees = data.total * 0.03;
@@ -152,16 +121,16 @@ const Checkout = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" required defaultValue={user?.user_metadata?.first_name || ""} />
+                  <Input id="firstName" required placeholder="Jane" />
                 </div>
                 <div>
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" required defaultValue={user?.user_metadata?.last_name || ""} />
+                  <Input id="lastName" required placeholder="Doe" />
                 </div>
               </div>
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" required defaultValue={user?.email || ""} />
+                <Input id="email" type="email" required placeholder="jane@example.com" />
               </div>
             </div>
 
