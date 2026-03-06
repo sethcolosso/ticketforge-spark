@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, CheckCircle2, XCircle, Clock, Users, Package, DollarSign, Eye } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Clock, Users, Package, DollarSign, Eye, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { supabase } from "@/integrations/supabase/client";
 import type { DbEvent, DbOrder } from "@/types/database";
+import AdminEventForm from "@/components/admin/AdminEventForm";
+import AdminEventList from "@/components/admin/AdminEventList";
+import AdminOrderList from "@/components/admin/AdminOrderList";
+import AdminUserManager from "@/components/admin/AdminUserManager";
 
 const AdminDashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -19,6 +23,8 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [userCount, setUserCount] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !rolesLoading) {
@@ -54,22 +60,18 @@ const AdminDashboard = () => {
 
   const handleApprove = async (eventId: string) => {
     const { error } = await (supabase as any)
-      .from('events')
-      .update({ status: 'approved' })
-      .eq('id', eventId);
+      .from('events').update({ status: 'approved' }).eq('id', eventId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Event approved!", description: "It will now appear in public listings." });
+      toast({ title: "Event approved!" });
       fetchData();
     }
   };
 
   const handleReject = async (eventId: string) => {
     const { error } = await (supabase as any)
-      .from('events')
-      .update({ status: 'rejected' })
-      .eq('id', eventId);
+      .from('events').update({ status: 'rejected' }).eq('id', eventId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
@@ -92,13 +94,23 @@ const AdminDashboard = () => {
   return (
     <div className="py-12">
       <div className="container mx-auto px-4 max-w-6xl">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-            <Shield className="h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-heading font-bold">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground">Manage events, users, and platform</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-heading font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Manage events, users, and platform</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setShowUsers(!showUsers); setShowForm(false); }} className="gap-2">
+              <Users className="h-4 w-4" /> {showUsers ? "Hide Users" : "Manage Users"}
+            </Button>
+            <Button size="sm" onClick={() => { setShowForm(!showForm); setShowUsers(false); }} className="gap-2">
+              <Plus className="h-4 w-4" /> {showForm ? "Cancel" : "Post Event"}
+            </Button>
           </div>
         </div>
 
@@ -122,6 +134,12 @@ const AdminDashboard = () => {
           ))}
         </div>
 
+        {/* Admin Post Event Form */}
+        {showForm && <AdminEventForm userId={user!.id} onSuccess={() => { setShowForm(false); fetchData(); }} />}
+
+        {/* User Management */}
+        {showUsers && <AdminUserManager />}
+
         {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {(['pending', 'approved', 'rejected', 'all'] as const).map(t => (
@@ -134,78 +152,15 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Events */}
-        {filteredEvents.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground border border-border rounded-lg bg-card">
-            <p>No {tab} events.</p>
-          </div>
-        ) : (
-          <div className="space-y-3 mb-10">
-            {filteredEvents.map(evt => (
-              <div key={evt.id} className="rounded-lg border border-border bg-card p-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {evt.image_url && (
-                    <img src={evt.image_url} alt={evt.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
-                  )}
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-heading font-semibold">{evt.title}</h3>
-                      <Badge variant="secondary" className="text-xs capitalize">{evt.status}</Badge>
-                      {evt.is_featured && <Badge className="bg-primary text-primary-foreground text-xs">Featured</Badge>}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{evt.venue}, {evt.location} · {new Date(evt.date).toLocaleDateString()}</p>
-                    <p className="text-xs text-muted-foreground">{evt.category} · {(evt.ticket_types || []).length} ticket types · Cap: {evt.capacity || '∞'}</p>
-                    {evt.description && <p className="text-xs text-muted-foreground line-clamp-2">{evt.description}</p>}
-                  </div>
-                  <div className="flex items-start gap-2 flex-shrink-0">
-                    {evt.status === 'pending' && (
-                      <>
-                        <Button size="sm" onClick={() => handleApprove(evt.id)} className="gap-1">
-                          <CheckCircle2 className="h-4 w-4" /> Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleReject(evt.id)} className="gap-1">
-                          <XCircle className="h-4 w-4" /> Reject
-                        </Button>
-                      </>
-                    )}
-                    {evt.status === 'rejected' && (
-                      <Button size="sm" variant="outline" onClick={() => handleApprove(evt.id)}>Approve</Button>
-                    )}
-                    <Button size="sm" variant="ghost" onClick={() => handleToggleFeatured(evt.id, evt.is_featured)}
-                      title={evt.is_featured ? 'Remove featured' : 'Mark as featured'}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <AdminEventList
+          events={filteredEvents}
+          tab={tab}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onToggleFeatured={handleToggleFeatured}
+        />
 
-        {/* Recent Orders */}
-        <h2 className="text-xl font-heading font-bold mb-4">Recent Orders</h2>
-        {orders.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground border border-border rounded-lg bg-card">
-            <p>No orders yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {orders.slice(0, 20).map(order => (
-              <div key={order.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{order.events?.title || 'Unknown Event'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Order {order.id.slice(0, 8)} · {(order.order_items || []).reduce((s, i) => s + i.quantity, 0)} tickets · {new Date(order.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-heading font-bold text-primary">${Number(order.total_amount).toFixed(2)}</p>
-                  <Badge variant="secondary" className="text-xs capitalize">{order.status}</Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <AdminOrderList orders={orders} />
       </div>
     </div>
   );
