@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Package, DollarSign, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Plus, Package, DollarSign, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,8 @@ const SellerDashboard = () => {
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [title, setTitle] = useState("");
