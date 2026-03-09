@@ -13,22 +13,18 @@ serve(async (req) => {
   try {
     const { orderId, userEmail, eventTitle, eventDate, eventVenue, tickets, total } = await req.json();
 
-    // Format ticket details
-    const ticketLines = tickets.map((t: any) => `${t.quantity}x ${t.name} - $${(t.price * t.quantity).toFixed(2)}`).join('\n');
+    const ticketLines = tickets.map((t: { quantity: number; name: string; price: number }) => 
+      `${t.quantity}x ${t.name} - $${(t.price * t.quantity).toFixed(2)}`
+    ).join('\n');
     
     const formattedDate = new Date(eventDate).toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    // Log the email content (in production, integrate with an email service)
     console.log(`
       === TICKET CONFIRMATION EMAIL ===
       To: ${userEmail}
       Subject: Your URBANPUNK Tickets - ${eventTitle}
-      
-      Hey there! 🎟️
-      
-      Your tickets have been confirmed!
       
       Event: ${eventTitle}
       Date: ${formattedDate}
@@ -40,7 +36,6 @@ serve(async (req) => {
       Total: $${total.toFixed(2)}
       Order ID: ${orderId}
       
-      See you there!
       — URBANPUNK Team
       ================================
     `);
@@ -49,10 +44,11 @@ serve(async (req) => {
       JSON.stringify({ success: true, message: 'Confirmation logged' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
-    console.error('Error:', error);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error:', message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

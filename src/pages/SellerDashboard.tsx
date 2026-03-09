@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Package, DollarSign, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Plus, Package, DollarSign, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,8 @@ const SellerDashboard = () => {
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -124,6 +126,24 @@ const SellerDashboard = () => {
     setTitle(""); setDescription(""); setDate(""); setTime(""); setVenue("");
     setLocation(""); setCity(""); setCategory("Music"); setCapacity(""); setImageUrl("");
     setTicketTypes([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingImage(true);
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(path, file);
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(path);
+      setImageUrl(publicUrl);
+      toast({ title: "Image uploaded!" });
+    }
+    setUploadingImage(false);
   };
 
   const addTicketType = () => {
@@ -233,7 +253,21 @@ const SellerDashboard = () => {
               <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your event..." rows={3} />
             </div>
             <div>
-              <Label>Image URL</Label>
+              <Label>Event Image</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+                {uploadingImage && <span className="text-xs text-muted-foreground">Uploading...</span>}
+              </div>
+              {imageUrl && (
+                <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Or paste a URL:</p>
               <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" />
             </div>
 

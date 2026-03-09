@@ -14,84 +14,272 @@ export type Database = {
   }
   public: {
     Tables: {
-      ticket_orders: {
+      events: {
         Row: {
-          cancellation_reason: string | null
-          cancelled_at: string | null
+          capacity: number | null
+          category: string
+          city: string | null
           created_at: string
-          event_date: string
-          event_id: string
-          event_image: string | null
-          event_location: string
-          event_slug: string
-          event_title: string
-          event_venue: string
+          date: string
+          description: string | null
           id: string
-          order_code: string
-          service_fee: number
-          status: "cancelled" | "confirmed"
-          subtotal: number
-          ticket_count: number
-          ticket_items: Json
-          total: number
+          image_url: string | null
+          is_featured: boolean
+          location: string
+          seller_id: string
+          slug: string
+          status: Database["public"]["Enums"]["event_status"]
+          time: string | null
+          title: string
           updated_at: string
+          venue: string
+        }
+        Insert: {
+          capacity?: number | null
+          category?: string
+          city?: string | null
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean
+          location: string
+          seller_id: string
+          slug: string
+          status?: Database["public"]["Enums"]["event_status"]
+          time?: string | null
+          title: string
+          updated_at?: string
+          venue: string
+        }
+        Update: {
+          capacity?: number | null
+          category?: string
+          city?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_featured?: boolean
+          location?: string
+          seller_id?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["event_status"]
+          time?: string | null
+          title?: string
+          updated_at?: string
+          venue?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          id: string
+          order_id: string
+          quantity: number
+          ticket_type_id: string
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          quantity?: number
+          ticket_type_id: string
+          unit_price: number
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          quantity?: number
+          ticket_type_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_ticket_type_id_fkey"
+            columns: ["ticket_type_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
           user_id: string
         }
         Insert: {
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
           created_at?: string
-          event_date: string
           event_id: string
-          event_image?: string | null
-          event_location: string
-          event_slug: string
-          event_title: string
-          event_venue: string
           id?: string
-          order_code: string
-          service_fee: number
-          status?: "cancelled" | "confirmed"
-          subtotal: number
-          ticket_count: number
-          ticket_items: Json
-          total: number
-          updated_at?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount: number
           user_id: string
         }
         Update: {
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
           created_at?: string
-          event_date?: string
           event_id?: string
-          event_image?: string | null
-          event_location?: string
-          event_slug?: string
-          event_title?: string
-          event_venue?: string
           id?: string
-          order_code?: string
-          service_fee?: number
-          status?: "cancelled" | "confirmed"
-          subtotal?: number
-          ticket_count?: number
-          ticket_items?: Json
-          total?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
           updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ticket_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_id: string
+          id: string
+          name: string
+          price: number
+          quantity_available: number
+          quantity_sold: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_id: string
+          id?: string
+          name: string
+          price?: number
+          quantity_available?: number
+          quantity_sold?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_id?: string
+          id?: string
+          name?: string
+          price?: number
+          quantity_available?: number
+          quantity_sold?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_types_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
+      }
+      waitlist: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "seller" | "buyer"
+      event_status: "pending" | "approved" | "rejected"
+      order_status: "confirmed" | "cancelled" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -218,6 +406,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "seller", "buyer"],
+      event_status: ["pending", "approved", "rejected"],
+      order_status: ["confirmed", "cancelled", "refunded"],
+    },
   },
 } as const

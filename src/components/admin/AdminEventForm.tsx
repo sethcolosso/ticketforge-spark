@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,25 @@ const AdminEventForm = ({ userId, onSuccess }: Props) => {
   const [imageUrl, setImageUrl] = useState("");
   const [isFeatured, setIsFeatured] = useState(false);
   const [ticketTypes, setTicketTypes] = useState([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    const ext = file.name.split('.').pop();
+    const path = `${userId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(path, file);
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(path);
+      setImageUrl(publicUrl);
+      toast({ title: "Image uploaded!" });
+    }
+    setUploadingImage(false);
+  };
 
   const generateSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
 
@@ -105,7 +124,16 @@ const AdminEventForm = ({ userId, onSuccess }: Props) => {
         <div><Label>Capacity</Label><Input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="500" /></div>
       </div>
       <div><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the event..." rows={3} /></div>
-      <div><Label>Image URL</Label><Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." /></div>
+      <div>
+        <Label>Event Image</Label>
+        <div className="flex gap-2 items-center">
+          <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} disabled={uploadingImage} />
+          {uploadingImage && <span className="text-xs text-muted-foreground">Uploading...</span>}
+        </div>
+        {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />}
+        <p className="text-xs text-muted-foreground mt-1">Or paste a URL:</p>
+        <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." />
+      </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} id="featured" className="rounded" />
         <Label htmlFor="featured">Featured Event</Label>

@@ -83,10 +83,10 @@ const EventDetail = () => {
     }
     const selected = tickets
       .filter(t => (quantities[t.id] || 0) > 0)
-      .map(t => ({ id: t.id, name: t.name, price: Number(t.price), quantity: quantities[t.id], description: t.description }));
+      .map(t => ({ ticket_type_id: t.id, name: t.name, price: Number(t.price), quantity: quantities[t.id], description: t.description }));
 
     sessionStorage.setItem("checkout", JSON.stringify({
-      event: { id: event.id, title: event.title, date: event.date, venue: event.venue, location: event.location, image_url: event.image_url },
+      event: { id: event.id, slug: event.slug, title: event.title, date: event.date, venue: event.venue, location: event.location, image: event.image_url },
       tickets: selected,
       total: totalPrice,
     }));
