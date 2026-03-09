@@ -60,14 +60,6 @@ const Dashboard = () => {
   const meta = user?.user_metadata || {};
   const displayName = user ? ([meta.first_name, meta.last_name].filter(Boolean).join(" ") || user.email?.split("@")[0] || "User") : "";
 
-  if (loading) return <div className="py-24 text-center text-muted-foreground">Loading...</div>;
-  if (!user) return null;
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate("/");
-  };
-
   const totals = useMemo(() => {
     const upcoming = orders.filter(o => o.status === "confirmed" && o.events && new Date(o.events.date) >= new Date()).length;
     const ticketsPurchased = orders
@@ -78,6 +70,14 @@ const Dashboard = () => {
       .reduce((sum, o) => sum + Number(o.total_amount), 0);
     return { upcoming, ticketsPurchased, totalSpent };
   }, [orders]);
+
+  if (loading) return <div className="py-24 text-center text-muted-foreground">Loading...</div>;
+  if (!user) return null;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   const handleCancelOrder = async (order: TicketOrder) => {
     if (!user) return;
