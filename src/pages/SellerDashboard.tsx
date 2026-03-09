@@ -253,7 +253,21 @@ const SellerDashboard = () => {
               <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your event..." rows={3} />
             </div>
             <div>
-              <Label>Image URL</Label>
+              <Label>Event Image</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+                {uploadingImage && <span className="text-xs text-muted-foreground">Uploading...</span>}
+              </div>
+              {imageUrl && (
+                <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Or paste a URL:</p>
               <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" />
             </div>
 
