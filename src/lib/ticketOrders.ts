@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Json, Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export interface CheckoutTicketItem {
+  ticket_type_id: string;
   name: string;
   price: number;
   quantity: number;
@@ -21,17 +21,30 @@ export interface CheckoutOrderPayload {
   total: number;
 }
 
-export type TicketOrder = Tables<"ticket_orders">;
-
-const SERVICE_FEE_RATE = 0.03;
-
-const toMoney = (value: number) => Number(value.toFixed(2));
-
-const buildOrderCode = () => {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `TF-${date}-${random}`;
-};
+export interface TicketOrder {
+  id: string;
+  user_id: string;
+  event_id: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  events?: {
+    title: string;
+    slug: string;
+    date: string;
+    venue: string;
+    location: string;
+    image_url: string | null;
+  };
+  order_items?: {
+    id: string;
+    quantity: number;
+    unit_price: number;
+    ticket_types?: {
+      name: string;
+    };
+  }[];
+}
 
 export const createTicketOrder = async (userId: string, payload: CheckoutOrderPayload) => {
   const ticketCount = payload.tickets.reduce((sum, item) => sum + item.quantity, 0);
@@ -39,82 +52,78 @@ export const createTicketOrder = async (userId: string, payload: CheckoutOrderPa
     throw new Error("Select at least one ticket to place an order.");
   }
 
-  const subtotal = toMoney(payload.total);
-  const serviceFee = toMoney(subtotal * SERVICE_FEE_RATE);
-  const total = toMoney(subtotal + serviceFee);
+  const total = Number(payload.total.toFixed(2));
 
-  const insertPayload: TablesInsert<"ticket_orders"> = {
-    user_id: userId,
-    order_code: buildOrderCode(),
-    event_id: payload.event.id,
-    event_slug: payload.event.slug,
-    event_title: payload.event.title,
-    event_date: payload.event.date,
-    event_venue: payload.event.venue,
-    event_location: payload.event.location,
-    event_image: payload.event.image ?? null,
-    ticket_items: payload.tickets as unknown as Json,
-    ticket_count: ticketCount,
-    subtotal,
-    service_fee: serviceFee,
-    total,
-    status: "confirmed",
-  };
-
-  const { data, error } = await supabase
-    .from("ticket_orders")
-    .insert(insertPayload)
+  // Create order
+  const { data: order, error: orderError } = await (supabase as any)
+    .from('orders')
+    .insert({
+      user_id: userId,
+      event_id: payload.event.id,
+      total_amount: total,
+      status: 'confirmed',
+    })
     .select()
     .single();
 
+  if (orderError || !order) {
+    throw new Error(orderError?.message || "Failed to create order");
+  }
+
+  // Create order items
+  const items = payload.tickets
+    .filter(t => t.quantity > 0)
+    .map(t => ({
+      order_id: order.id,
+      ticket_type_id: t.ticket_type_id,
+      quantity: t.quantity,
+      unit_price: t.price,
+    }));
+
+  if (items.length > 0) {
+    const { error: itemsError } = await (supabase as any)
+      .from('order_items')
+      .insert(items);
+    if (itemsError) {
+      throw new Error(itemsError.message);
+    }
+  }
+
+  return { ...order, order_code: order.id.slice(0, 8).toUpperCase() };
+};
+
+export const fetchTicketOrdersForUser = async (userId: string): Promise<TicketOrder[]> => {
+  const { data, error } = await (supabase as any)
+    .from('orders')
+    .select('*, events(title, slug, date, venue, location, image_url), order_items(id, quantity, unit_price, ticket_types(name))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  return data || [];
 };
 
-export const fetchTicketOrdersForUser = async (userId: string) => {
-  const { data, error } = await supabase
-    .from("ticket_orders")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data;
+export const isOrderCancelable = (order: TicketOrder) => {
+  if (order.status !== 'confirmed') return false;
+  const eventDate = order.events?.date;
+  if (!eventDate) return false;
+  return new Date(eventDate) > new Date();
 };
 
-export const isOrderCancelable = (order: Pick<TicketOrder, "status" | "event_date">) => {
-  if (order.status !== "confirmed") return false;
-
-  const today = new Date();
-  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const eventDate = new Date(order.event_date);
-  const eventDateUTC = Date.UTC(eventDate.getUTCFullYear(), eventDate.getUTCMonth(), eventDate.getUTCDate());
-
-  return eventDateUTC > todayUTC;
-};
-
-export const cancelTicketOrder = async (order: TicketOrder, userId: string, reason?: string) => {
+export const cancelTicketOrder = async (order: TicketOrder, userId: string) => {
   if (!isOrderCancelable(order)) {
     throw new Error("This order is no longer eligible for cancellation.");
   }
 
-  const { data, error } = await supabase
-    .from("ticket_orders")
-    .update({
-      status: "cancelled",
-      cancellation_reason: reason ?? "Cancelled by customer",
-      cancelled_at: new Date().toISOString(),
-    })
-    .eq("id", order.id)
-    .eq("user_id", userId)
-    .eq("status", "confirmed")
-    .select()
+  const { data, error } = await (supabase as any)
+    .from('orders')
+    .update({ status: 'cancelled' })
+    .eq('id', order.id)
+    .eq('user_id', userId)
+    .select('*, events(title, slug, date, venue, location, image_url), order_items(id, quantity, unit_price, ticket_types(name))')
     .single();
 
   if (error) {
