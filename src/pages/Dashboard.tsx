@@ -62,7 +62,6 @@ const Dashboard = () => {
 
   if (loading) return <div className="py-24 text-center text-muted-foreground">Loading...</div>;
   if (!user) return null;
-  const displayName = [meta.first_name, meta.last_name].filter(Boolean).join(" ") || user.email?.split("@")[0] || "User";
 
   const handleLogout = async () => {
     await signOut();
