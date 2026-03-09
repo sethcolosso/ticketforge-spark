@@ -27,6 +27,25 @@ const AdminEventForm = ({ userId, onSuccess }: Props) => {
   const [imageUrl, setImageUrl] = useState("");
   const [isFeatured, setIsFeatured] = useState(false);
   const [ticketTypes, setTicketTypes] = useState([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    const ext = file.name.split('.').pop();
+    const path = `${userId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(path, file);
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(path);
+      setImageUrl(publicUrl);
+      toast({ title: "Image uploaded!" });
+    }
+    setUploadingImage(false);
+  };
 
   const generateSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
 
