@@ -57,10 +57,11 @@ const Dashboard = () => {
     loadOrders();
   }, [user, toast]);
 
+  const meta = user?.user_metadata || {};
+  const displayName = user ? ([meta.first_name, meta.last_name].filter(Boolean).join(" ") || user.email?.split("@")[0] || "User") : "";
+
   if (loading) return <div className="py-24 text-center text-muted-foreground">Loading...</div>;
   if (!user) return null;
-
-  const meta = user.user_metadata || {};
   const displayName = [meta.first_name, meta.last_name].filter(Boolean).join(" ") || user.email?.split("@")[0] || "User";
 
   const handleLogout = async () => {
