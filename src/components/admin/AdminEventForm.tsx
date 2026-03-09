@@ -124,7 +124,16 @@ const AdminEventForm = ({ userId, onSuccess }: Props) => {
         <div><Label>Capacity</Label><Input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="500" /></div>
       </div>
       <div><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the event..." rows={3} /></div>
-      <div><Label>Image URL</Label><Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." /></div>
+      <div>
+        <Label>Event Image</Label>
+        <div className="flex gap-2 items-center">
+          <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} disabled={uploadingImage} />
+          {uploadingImage && <span className="text-xs text-muted-foreground">Uploading...</span>}
+        </div>
+        {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />}
+        <p className="text-xs text-muted-foreground mt-1">Or paste a URL:</p>
+        <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." />
+      </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} id="featured" className="rounded" />
         <Label htmlFor="featured">Featured Event</Label>
