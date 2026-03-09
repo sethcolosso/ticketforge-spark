@@ -126,6 +126,24 @@ const SellerDashboard = () => {
     setTitle(""); setDescription(""); setDate(""); setTime(""); setVenue("");
     setLocation(""); setCity(""); setCategory("Music"); setCapacity(""); setImageUrl("");
     setTicketTypes([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingImage(true);
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('event-images').upload(path, file);
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(path);
+      setImageUrl(publicUrl);
+      toast({ title: "Image uploaded!" });
+    }
+    setUploadingImage(false);
   };
 
   const addTicketType = () => {
