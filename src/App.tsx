@@ -11,12 +11,13 @@ import EventDetail from "./pages/EventDetail";
 import Checkout from "./pages/Checkout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import ProfileSettings from "./pages/ProfileSettings";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Pricing from "./pages/Pricing";
-import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
