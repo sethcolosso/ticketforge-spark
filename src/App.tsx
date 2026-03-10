@@ -18,6 +18,7 @@ import ProfileSettings from "./pages/ProfileSettings";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Pricing from "./pages/Pricing";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
