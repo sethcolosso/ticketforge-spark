@@ -55,6 +55,7 @@ export interface DbProfile {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
 }
