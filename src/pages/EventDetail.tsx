@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { CalendarDays, MapPin, Clock, ArrowLeft, Minus, Plus, Bell } from "lucide-react";
+import { CalendarDays, MapPin, Clock, ArrowLeft, Minus, Plus, Bell, TrendingUp, TrendingDown, Minus as TrendStable, BadgeCheck, Flame, Users, Timer, Brain } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,29 +8,47 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { DbEvent, DbTicketType } from "@/types/database";
 
+interface PricePrediction {
+  trend: "rising" | "stable" | "falling";
+  confidence: "high" | "medium" | "low";
+  explanation: string;
+}
+
 const EventDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [event, setEvent] = useState<DbEvent | null>(null);
+  const [event, setEvent] = useState<(DbEvent & { seller_verified?: boolean }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [onWaitlist, setOnWaitlist] = useState(false);
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
+  const [prediction, setPrediction] = useState<PricePrediction | null>(null);
+  const [predictLoading, setPredictLoading] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchEvent = async () => {
       const { data } = await (supabase as any)
         .from('events')
         .select('*, ticket_types(*)')
         .eq('slug', slug)
         .single();
+      
+      if (data) {
+        // Check if seller is verified
+        const { data: profile } = await (supabase as any)
+          .from('profiles')
+          .select('is_verified')
+          .eq('id', data.seller_id)
+          .maybeSingle();
+        data.seller_verified = profile?.is_verified || false;
+      }
+      
       setEvent(data);
       setLoading(false);
 
-      // Check waitlist status
       if (data && user) {
         const { data: wl } = await (supabase as any)
           .from('waitlist')
@@ -41,8 +59,23 @@ const EventDetail = () => {
         setOnWaitlist(!!wl);
       }
     };
-    fetch();
+    fetchEvent();
   }, [slug, user]);
+
+  const fetchPrediction = async () => {
+    if (!event) return;
+    setPredictLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-price-predict', {
+        body: { event },
+      });
+      if (error) throw error;
+      if (data?.prediction) setPrediction(data.prediction);
+    } catch (e) {
+      toast({ title: "Prediction unavailable", description: "Could not fetch AI prediction.", variant: "destructive" });
+    }
+    setPredictLoading(false);
+  };
 
   if (loading) return <div className="container mx-auto px-4 py-20 text-center text-muted-foreground">Loading...</div>;
 
@@ -57,10 +90,18 @@ const EventDetail = () => {
 
   const tickets = event.ticket_types || [];
   const soldOut = tickets.length > 0 && tickets.every(t => t.quantity_sold >= t.quantity_available);
+  const totalSold = tickets.reduce((s, t) => s + t.quantity_sold, 0);
+  const totalAvail = tickets.reduce((s, t) => s + t.quantity_available, 0);
+  const sellRatio = totalAvail > 0 ? totalSold / totalAvail : 0;
 
   const formattedDate = new Date(event.date).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
+
+  // Countdown
+  const diff = new Date(event.date).getTime() - Date.now();
+  const daysLeft = diff > 0 ? Math.floor(diff / (1000 * 60 * 60 * 24)) : 0;
+  const hoursLeft = diff > 0 ? Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) : 0;
 
   const updateQty = (ticketId: string, delta: number) => {
     setQuantities(prev => {
@@ -116,6 +157,12 @@ const EventDetail = () => {
     }
   };
 
+  const trendIcon = prediction?.trend === "rising"
+    ? <TrendingUp className="h-4 w-4 text-green-500" />
+    : prediction?.trend === "falling"
+    ? <TrendingDown className="h-4 w-4 text-destructive" />
+    : <TrendStable className="h-4 w-4 text-muted-foreground" />;
+
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
@@ -126,11 +173,20 @@ const EventDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Event Info */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-lg overflow-hidden aspect-[16/9] bg-secondary">
+            <div className="rounded-lg overflow-hidden aspect-[16/9] bg-secondary relative">
               {event.image_url ? (
                 <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">No Image</div>
+              )}
+              {/* Countdown overlay */}
+              {diff > 0 && daysLeft <= 30 && (
+                <div className="absolute bottom-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg px-4 py-2 border border-border">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Timer className="h-4 w-4 text-primary" />
+                    <span>{daysLeft > 0 ? `${daysLeft}d ${hoursLeft}h` : `${hoursLeft}h`} until event</span>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -139,8 +195,25 @@ const EventDetail = () => {
                 <Badge variant="secondary">{event.category}</Badge>
                 {soldOut && <Badge variant="destructive">Sold Out</Badge>}
                 {event.is_featured && <Badge className="bg-primary text-primary-foreground">Featured</Badge>}
+                {sellRatio >= 0.7 && !soldOut && (
+                  <Badge className="bg-orange-500 text-white"><Flame className="h-3 w-3 mr-1" />Selling Fast</Badge>
+                )}
+                {event.seller_verified && (
+                  <Badge variant="outline" className="border-primary/50 text-primary">
+                    <BadgeCheck className="h-3 w-3 mr-1" />Verified Seller
+                  </Badge>
+                )}
               </div>
               <h1 className="text-3xl md:text-4xl font-heading font-bold">{event.title}</h1>
+              
+              {/* Social proof */}
+              {totalSold > 0 && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-primary" />
+                  {totalSold} {totalSold === 1 ? "person has" : "people have"} bought tickets for this event
+                </p>
+              )}
+
               <div className="flex flex-col gap-2 text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-primary" />
@@ -163,6 +236,34 @@ const EventDetail = () => {
                   <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{event.description}</p>
                 </div>
               )}
+
+              {/* AI Price Prediction */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-primary" /> AI Price Insight
+                  </h2>
+                  {!prediction && (
+                    <Button variant="outline" size="sm" onClick={fetchPrediction} disabled={predictLoading}>
+                      {predictLoading ? "Analyzing..." : "Get Prediction"}
+                    </Button>
+                  )}
+                </div>
+                {prediction ? (
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+                    <div className="flex items-center gap-3">
+                      {trendIcon}
+                      <span className="font-medium capitalize">
+                        Prices likely {prediction.trend}
+                      </span>
+                      <Badge variant="secondary" className="text-xs capitalize">{prediction.confidence} confidence</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{prediction.explanation}</p>
+                  </div>
+                ) : !predictLoading ? (
+                  <p className="text-sm text-muted-foreground">Click "Get Prediction" to see AI-powered price insights for this event.</p>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -215,6 +316,7 @@ const EventDetail = () => {
                     <span className="text-muted-foreground">{totalItems} ticket{totalItems > 1 ? "s" : ""}</span>
                     <span className="font-heading font-bold text-lg">${totalPrice.toFixed(2)}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground">+ 3% service fee at checkout</p>
                   <Button className="w-full" size="lg" onClick={handleCheckout}>Checkout</Button>
                 </div>
               )}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trash2, UserX, ShieldPlus, Store } from "lucide-react";
+import { Trash2, UserX, ShieldPlus, Store, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ interface UserProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  is_verified: boolean;
   created_at: string;
 }
 
@@ -63,6 +64,16 @@ const AdminUserManager = () => {
     }
   };
 
+  const handleToggleVerified = async (profileId: string, current: boolean) => {
+    const { error } = await (supabase as any).from('profiles').update({ is_verified: !current }).eq('id', profileId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: !current ? "Seller verified!" : "Verification removed" });
+      fetchData();
+    }
+  };
+
   const handleDeleteUser = async (profileId: string) => {
     if (!confirm("Are you sure you want to delete this user? This will remove their profile and roles.")) return;
     await (supabase as any).from('user_roles').delete().eq('user_id', profileId);
@@ -92,8 +103,9 @@ const AdminUserManager = () => {
             return (
               <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-md border border-border bg-background gap-2">
                 <div>
-                  <p className="text-sm font-medium">
+                  <p className="text-sm font-medium flex items-center gap-1.5">
                     {[p.first_name, p.last_name].filter(Boolean).join(" ") || "Unnamed User"}
+                    {p.is_verified && <BadgeCheck className="h-4 w-4 text-primary" />}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     ID: {p.id.slice(0, 8)}... · Joined {new Date(p.created_at).toLocaleDateString()}
@@ -117,6 +129,9 @@ const AdminUserManager = () => {
                       <Store className="h-3 w-3" /> Make Seller
                     </Button>
                   )}
+                  <Button variant="outline" size="sm" className={`gap-1 text-xs ${p.is_verified ? 'border-primary/50' : ''}`} onClick={() => handleToggleVerified(p.id, p.is_verified)}>
+                    <BadgeCheck className="h-3 w-3" /> {p.is_verified ? "Unverify" : "Verify"}
+                  </Button>
                   <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive gap-1 text-xs" onClick={() => handleDeleteUser(p.id)}>
                     <Trash2 className="h-4 w-4" /> Remove
                   </Button>

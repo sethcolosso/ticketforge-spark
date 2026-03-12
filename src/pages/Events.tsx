@@ -1,15 +1,26 @@
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import type { DbEvent } from "@/types/database";
 import EventCard from "@/components/EventCard";
+
+interface Recommendation {
+  slug: string;
+  reason: string;
+}
 
 const Events = () => {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [events, setEvents] = useState<DbEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchEvents();
@@ -25,6 +36,32 @@ const Events = () => {
     setLoading(false);
   };
 
+  const fetchRecommendations = async () => {
+    if (events.length === 0) return;
+    setRecLoading(true);
+    try {
+      const eventsForAI = events.map(e => ({
+        title: e.title,
+        slug: e.slug,
+        category: e.category,
+        date: e.date,
+        location: e.location,
+        minPrice: (e.ticket_types || []).length > 0
+          ? Math.min(...(e.ticket_types || []).map(t => Number(t.price)))
+          : 0,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('ai-recommend', {
+        body: { events: eventsForAI, userQuery: search || undefined },
+      });
+      if (error) throw error;
+      if (data?.recommendations) setRecommendations(data.recommendations);
+    } catch {
+      // Silently fail for recommendations
+    }
+    setRecLoading(false);
+  };
+
   const categories = ["All", ...new Set(events.map(e => e.category))];
 
   const filtered = events
@@ -35,6 +72,10 @@ const Events = () => {
       (e.city || '').toLowerCase().includes(search.toLowerCase()) ||
       (e.description || '').toLowerCase().includes(search.toLowerCase())
     );
+
+  const recommendedEvents = recommendations
+    .map(r => events.find(e => e.slug === r.slug))
+    .filter(Boolean) as DbEvent[];
 
   return (
     <div className="py-12">
@@ -50,6 +91,10 @@ const Events = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search events, locations, descriptions..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
           </div>
+          <Button variant="outline" size="sm" onClick={fetchRecommendations} disabled={recLoading || events.length === 0} className="gap-2 shrink-0">
+            <Sparkles className="h-4 w-4" />
+            {recLoading ? "Finding..." : "AI Recommendations"}
+          </Button>
           <div className="flex gap-2 flex-wrap">
             {categories.map(cat => (
               <button key={cat} onClick={() => setCategory(cat)}
@@ -62,15 +107,46 @@ const Events = () => {
           </div>
         </div>
 
+        {/* AI Recommendations */}
+        {recommendedEvents.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-heading font-bold mb-1 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" /> Recommended For You
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">AI-picked events based on your interests</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recommendedEvents.map((event, i) => (
+                <div key={event.id} className="relative">
+                  <EventCard event={event} />
+                  {recommendations[i]?.reason && (
+                    <div className="mt-2 px-3 py-1.5 rounded-md bg-primary/5 border border-primary/20">
+                      <p className="text-xs text-muted-foreground">
+                        <Sparkles className="h-3 w-3 text-primary inline mr-1" />
+                        {recommendations[i].reason}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Grid */}
         {loading ? (
           <div className="text-center py-20 text-muted-foreground">Loading events...</div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(event => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
+          <>
+            <h2 className="text-xl font-heading font-bold mb-4">
+              {category === "All" ? "All Events" : category}
+              <span className="text-sm font-normal text-muted-foreground ml-2">({filtered.length})</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filtered.map(event => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+          </>
         ) : (
           <div className="text-center py-20 text-muted-foreground">
             <p className="text-lg">No events found{search ? " matching your search" : ""}.</p>
