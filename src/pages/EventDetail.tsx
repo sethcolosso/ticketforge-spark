@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { DbEvent, DbTicketType } from "@/types/database";
+import { formatCurrency } from "@/lib/currency";
+import EventChat from "@/components/EventChat";
 
 interface PricePrediction {
   trend: "rising" | "stable" | "falling";
@@ -27,6 +29,7 @@ const EventDetail = () => {
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
   const [prediction, setPrediction] = useState<PricePrediction | null>(null);
   const [predictLoading, setPredictLoading] = useState(false);
+  const [hasTicket, setHasTicket] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -37,7 +40,6 @@ const EventDetail = () => {
         .single();
       
       if (data) {
-        // Check if seller is verified
         const { data: profile } = await (supabase as any)
           .from('profiles')
           .select('is_verified')
@@ -57,6 +59,16 @@ const EventDetail = () => {
           .eq('event_id', data.id)
           .maybeSingle();
         setOnWaitlist(!!wl);
+
+        // Check if user has a ticket for this event
+        const { data: orders } = await (supabase as any)
+          .from('orders')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('event_id', data.id)
+          .eq('status', 'confirmed')
+          .limit(1);
+        setHasTicket((orders || []).length > 0);
       }
     };
     fetchEvent();
@@ -98,7 +110,6 @@ const EventDetail = () => {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
 
-  // Countdown
   const diff = new Date(event.date).getTime() - Date.now();
   const daysLeft = diff > 0 ? Math.floor(diff / (1000 * 60 * 60 * 24)) : 0;
   const hoursLeft = diff > 0 ? Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) : 0;
@@ -171,7 +182,6 @@ const EventDetail = () => {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Event Info */}
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-lg overflow-hidden aspect-[16/9] bg-secondary relative">
               {event.image_url ? (
@@ -179,7 +189,6 @@ const EventDetail = () => {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">No Image</div>
               )}
-              {/* Countdown overlay */}
               {diff > 0 && daysLeft <= 30 && (
                 <div className="absolute bottom-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg px-4 py-2 border border-border">
                   <div className="flex items-center gap-2 text-sm font-medium">
@@ -206,7 +215,6 @@ const EventDetail = () => {
               </div>
               <h1 className="text-3xl md:text-4xl font-heading font-bold">{event.title}</h1>
               
-              {/* Social proof */}
               {totalSold > 0 && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                   <Users className="h-4 w-4 text-primary" />
@@ -264,6 +272,9 @@ const EventDetail = () => {
                   <p className="text-sm text-muted-foreground">Click "Get Prediction" to see AI-powered price insights for this event.</p>
                 ) : null}
               </div>
+
+              {/* Event Community Chat */}
+              <EventChat eventId={event.id} hasTicket={hasTicket} />
             </div>
           </div>
 
@@ -286,7 +297,7 @@ const EventDetail = () => {
                         <p className="font-medium text-sm">{ticket.name}</p>
                         {ticket.description && <p className="text-xs text-muted-foreground">{ticket.description}</p>}
                       </div>
-                      <span className="font-heading font-bold text-primary">${Number(ticket.price).toFixed(2)}</span>
+                      <span className="font-heading font-bold text-primary">{formatCurrency(Number(ticket.price))}</span>
                     </div>
                     {unavailable ? (
                       <p className="text-xs text-destructive">Sold out</p>
@@ -314,7 +325,7 @@ const EventDetail = () => {
                 <div className="pt-4 border-t border-border space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{totalItems} ticket{totalItems > 1 ? "s" : ""}</span>
-                    <span className="font-heading font-bold text-lg">${totalPrice.toFixed(2)}</span>
+                    <span className="font-heading font-bold text-lg">{formatCurrency(totalPrice)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">+ 3% service fee at checkout</p>
                   <Button className="w-full" size="lg" onClick={handleCheckout}>Checkout</Button>

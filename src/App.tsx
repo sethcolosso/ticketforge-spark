@@ -18,6 +18,8 @@ import ProfileSettings from "./pages/ProfileSettings";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Pricing from "./pages/Pricing";
+import QRScanner from "./pages/QRScanner";
+import SplitPaymentPage from "./pages/SplitPaymentPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +46,8 @@ const App = () => (
               <Route path="/seller" element={<SellerDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/scanner" element={<QRScanner />} />
+              <Route path="/split/:code" element={<SplitPaymentPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

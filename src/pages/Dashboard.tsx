@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarDays, Ticket, User, LogOut, MapPin } from "lucide-react";
+import { CalendarDays, Ticket, User, LogOut, MapPin, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/currency";
+import QRTicket from "@/components/QRTicket";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,14 +25,13 @@ import {
   type TicketOrder,
 } from "@/lib/ticketOrders";
 
-const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
-
 const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<TicketOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -143,64 +144,82 @@ const Dashboard = () => {
               const items = order.order_items || [];
               const ticketCount = items.reduce((s, i) => s + i.quantity, 0);
               return (
-                <div key={order.id} className="rounded-lg border border-border bg-card p-4 flex flex-col sm:flex-row gap-4">
-                  {order.events?.image_url && (
-                    <img src={order.events.image_url} alt={order.events.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
-                  )}
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="font-heading font-semibold">{order.events?.title || "Unknown Event"}</h3>
-                      <Badge variant={order.status === "cancelled" ? "outline" : "secondary"} className="text-xs capitalize">{order.status}</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {order.events?.date && (
-                        <span className="flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
-                          {new Date(order.events.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
-                      )}
-                      {order.events?.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {order.events.location}
-                        </span>
-                      )}
-                    </div>
-                    {items.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {items.map(i => `${i.quantity}x ${i.ticket_types?.name || "Ticket"}`).join(" · ")}
-                      </p>
+                <div key={order.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {order.events?.image_url && (
+                      <img src={order.events.image_url} alt={order.events.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
                     )}
-                    <div className="flex items-center justify-between pt-2 gap-3">
-                      <span className="text-xs text-muted-foreground font-mono">{order.id.slice(0, 8).toUpperCase()}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">
-                          {ticketCount} ticket{ticketCount > 1 ? "s" : ""} · {formatCurrency(Number(order.total_amount))}
-                        </span>
-                        {isOrderCancelable(order) && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" disabled={cancellingOrderId === order.id}>
-                                {cancellingOrderId === order.id ? "Cancelling..." : "Cancel Order"}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will mark the order as cancelled. Cancelled tickets cannot be used for event entry.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep Order</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleCancelOrder(order)}>Confirm Cancellation</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-heading font-semibold">{order.events?.title || "Unknown Event"}</h3>
+                        <Badge variant={order.status === "cancelled" ? "outline" : "secondary"} className="text-xs capitalize">{order.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {order.events?.date && (
+                          <span className="flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" />
+                            {new Date(order.events.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
                         )}
+                        {order.events?.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {order.events.location}
+                          </span>
+                        )}
+                      </div>
+                      {items.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {items.map(i => `${i.quantity}x ${i.ticket_types?.name || "Ticket"}`).join(" · ")}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between pt-2 gap-3">
+                        <span className="text-xs text-muted-foreground font-mono">{order.id.slice(0, 8).toUpperCase()}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground">
+                            {ticketCount} ticket{ticketCount > 1 ? "s" : ""} · {formatCurrency(Number(order.total_amount))}
+                          </span>
+                          {order.status === "confirmed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowQR(showQR === order.id ? null : order.id)}
+                              className="gap-1"
+                            >
+                              <QrCode className="h-3 w-3" />
+                              {showQR === order.id ? "Hide QR" : "Show QR"}
+                            </Button>
+                          )}
+                          {isOrderCancelable(order) && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={cancellingOrderId === order.id}>
+                                  {cancellingOrderId === order.id ? "Cancelling..." : "Cancel Order"}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will mark the order as cancelled. Cancelled tickets cannot be used for event entry.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Keep Order</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleCancelOrder(order)}>Confirm Cancellation</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
+                  {showQR === order.id && order.status === "confirmed" && (
+                    <div className="flex justify-center pt-2 border-t border-border">
+                      <QRTicket orderId={order.id} eventTitle={order.events?.title || "Event"} />
+                    </div>
+                  )}
                 </div>
               );
             })}
