@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      event_messages: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_messages_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           capacity: number | null
@@ -118,6 +150,8 @@ export type Database = {
           created_at: string
           event_id: string
           id: string
+          qr_code: string | null
+          scanned_at: string | null
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
           user_id: string
@@ -126,6 +160,8 @@ export type Database = {
           created_at?: string
           event_id: string
           id?: string
+          qr_code?: string | null
+          scanned_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount: number
           user_id: string
@@ -134,6 +170,8 @@ export type Database = {
           created_at?: string
           event_id?: string
           id?: string
+          qr_code?: string | null
+          scanned_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
           user_id?: string
@@ -177,6 +215,88 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      split_payment_contributions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          mpesa_receipt: string | null
+          phone_number: string | null
+          split_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          mpesa_receipt?: string | null
+          phone_number?: string | null
+          split_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          mpesa_receipt?: string | null
+          phone_number?: string | null
+          split_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "split_payment_contributions_split_id_fkey"
+            columns: ["split_id"]
+            isOneToOne: false
+            referencedRelation: "split_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      split_payments: {
+        Row: {
+          created_at: string
+          id: string
+          inviter_id: string
+          num_splits: number
+          order_id: string
+          share_code: string
+          status: string
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inviter_id: string
+          num_splits?: number
+          order_id: string
+          share_code?: string
+          status?: string
+          total_amount: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inviter_id?: string
+          num_splits?: number
+          order_id?: string
+          share_code?: string
+          status?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "split_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ticket_types: {
         Row: {

@@ -13,7 +13,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "$0.99",
+    price: "KSh 99",
     priceNote: "per ticket sold",
     description: "For growing organizers who need more power.",
     features: ["Unlimited tickets", "Custom branding", "Promo codes & discounts", "Real-time analytics", "Priority support", "Multi-event dashboard"],

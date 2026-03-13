@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { CalendarDays, MapPin, Clock, TrendingUp, Flame, Users, Timer, BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { DbEvent } from "@/types/database";
+import { formatCurrency } from "@/lib/currency";
 
 const getCountdown = (dateStr: string) => {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -44,7 +45,6 @@ const EventCard = ({ event }: { event: DbEvent & { seller_verified?: boolean } }
       to={`/events/${event.slug}`}
       className="group block rounded-lg overflow-hidden border border-border bg-card hover:border-primary/40 transition-all duration-300 hover:box-glow"
     >
-      {/* Image */}
       <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
         {event.image_url ? (
           <img src={event.image_url} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
@@ -73,7 +73,6 @@ const EventCard = ({ event }: { event: DbEvent & { seller_verified?: boolean } }
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4 space-y-3">
         <div className="flex items-start gap-2">
           <h3 className="font-heading font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2 flex-1">
@@ -102,7 +101,7 @@ const EventCard = ({ event }: { event: DbEvent & { seller_verified?: boolean } }
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
-              {soldOut ? "Sold out" : tickets.length > 0 ? `From $${minPrice}` : "Free"}
+              {soldOut ? "Sold out" : tickets.length > 0 ? `From ${formatCurrency(minPrice)}` : "Free"}
             </span>
             {totalSold > 0 && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">

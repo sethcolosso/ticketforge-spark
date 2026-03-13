@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Package, DollarSign, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload } from "lucide-react";
+import { Plus, Package, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/currency";
 import type { DbEvent, DbOrder } from "@/types/database";
 
 const SellerDashboard = () => {
@@ -25,7 +26,6 @@ const SellerDashboard = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
@@ -36,7 +36,6 @@ const SellerDashboard = () => {
   const [category, setCategory] = useState("Music");
   const [capacity, setCapacity] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  // Ticket types
   const [ticketTypes, setTicketTypes] = useState([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
 
   useEffect(() => {
@@ -52,7 +51,6 @@ const SellerDashboard = () => {
   }, [user]);
 
   const fetchData = async () => {
-    // Fetch seller's events
     const { data: evts } = await (supabase as any)
       .from('events')
       .select('*, ticket_types(*)')
@@ -60,7 +58,6 @@ const SellerDashboard = () => {
       .order('created_at', { ascending: false });
     setEvents(evts || []);
 
-    // Fetch orders for seller's events
     const { data: ords } = await (supabase as any)
       .from('orders')
       .select('*, events!inner(*), order_items(*, ticket_types(*))')
@@ -80,16 +77,7 @@ const SellerDashboard = () => {
     const { data: evt, error } = await (supabase as any)
       .from('events')
       .insert({
-        seller_id: user.id,
-        title,
-        slug,
-        description,
-        date,
-        time,
-        venue,
-        location,
-        city,
-        category,
+        seller_id: user.id, title, slug, description, date, time, venue, location, city, category,
         capacity: capacity ? parseInt(capacity) : null,
         image_url: imageUrl || null,
       })
@@ -102,13 +90,9 @@ const SellerDashboard = () => {
       return;
     }
 
-    // Insert ticket types
     const tickets = ticketTypes.filter(t => t.name).map(t => ({
-      event_id: evt.id,
-      name: t.name,
-      description: t.description || null,
-      price: parseFloat(t.price) || 0,
-      quantity_available: parseInt(t.quantity) || 100,
+      event_id: evt.id, name: t.name, description: t.description || null,
+      price: parseFloat(t.price) || 0, quantity_available: parseInt(t.quantity) || 100,
     }));
 
     if (tickets.length > 0) {
@@ -181,17 +165,24 @@ const SellerDashboard = () => {
             <h1 className="text-2xl font-heading font-bold">Seller Dashboard</h1>
             <p className="text-sm text-muted-foreground">Manage your events and track sales</p>
           </div>
-          <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-            <Plus className="h-4 w-4" /> {showForm ? "Cancel" : "Post New Event"}
-          </Button>
+          <div className="flex gap-2">
+            <Link to="/scanner">
+              <Button variant="outline" className="gap-2">
+                <QrCode className="h-4 w-4" /> QR Scanner
+              </Button>
+            </Link>
+            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+              <Plus className="h-4 w-4" /> {showForm ? "Cancel" : "Post New Event"}
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
-            { label: "Total Events", value: events.length, icon: Package },
-            { label: "Tickets Sold", value: totalTicketsSold, icon: TrendingUp },
-            { label: "Revenue", value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign },
+            { label: "Total Events", value: String(events.length), icon: Package },
+            { label: "Tickets Sold", value: String(totalTicketsSold), icon: TrendingUp },
+            { label: "Revenue", value: formatCurrency(totalRevenue), icon: Package },
           ].map(stat => (
             <div key={stat.label} className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -210,10 +201,7 @@ const SellerDashboard = () => {
           <form onSubmit={handleSubmitEvent} className="rounded-lg border border-border bg-card p-6 space-y-4 mb-8">
             <h2 className="font-heading font-semibold text-lg">Create New Event</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Event Title *</Label>
-                <Input value={title} onChange={e => setTitle(e.target.value)} required placeholder="Neon Nights Festival" />
-              </div>
+              <div><Label>Event Title *</Label><Input value={title} onChange={e => setTitle(e.target.value)} required placeholder="Neon Nights Festival" /></div>
               <div>
                 <Label>Category *</Label>
                 <select value={category} onChange={e => setCategory(e.target.value)}
@@ -223,55 +211,25 @@ const SellerDashboard = () => {
                   ))}
                 </select>
               </div>
-              <div>
-                <Label>Date *</Label>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} required />
-              </div>
-              <div>
-                <Label>Time</Label>
-                <Input value={time} onChange={e => setTime(e.target.value)} placeholder="8:00 PM" />
-              </div>
-              <div>
-                <Label>Venue *</Label>
-                <Input value={venue} onChange={e => setVenue(e.target.value)} required placeholder="The Grand Arena" />
-              </div>
-              <div>
-                <Label>Location *</Label>
-                <Input value={location} onChange={e => setLocation(e.target.value)} required placeholder="New York, NY" />
-              </div>
-              <div>
-                <Label>City</Label>
-                <Input value={city} onChange={e => setCity(e.target.value)} placeholder="New York" />
-              </div>
-              <div>
-                <Label>Capacity</Label>
-                <Input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="500" />
-              </div>
+              <div><Label>Date *</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} required /></div>
+              <div><Label>Time</Label><Input value={time} onChange={e => setTime(e.target.value)} placeholder="8:00 PM" /></div>
+              <div><Label>Venue *</Label><Input value={venue} onChange={e => setVenue(e.target.value)} required placeholder="The Grand Arena" /></div>
+              <div><Label>Location *</Label><Input value={location} onChange={e => setLocation(e.target.value)} required placeholder="Nairobi, Kenya" /></div>
+              <div><Label>City</Label><Input value={city} onChange={e => setCity(e.target.value)} placeholder="Nairobi" /></div>
+              <div><Label>Capacity</Label><Input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="500" /></div>
             </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your event..." rows={3} />
-            </div>
+            <div><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your event..." rows={3} /></div>
             <div>
               <Label>Event Image</Label>
               <div className="flex gap-2 items-center">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                />
+                <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} disabled={uploadingImage} />
                 {uploadingImage && <span className="text-xs text-muted-foreground">Uploading...</span>}
               </div>
-              {imageUrl && (
-                <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />
-              )}
+              {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 h-20 w-32 object-cover rounded-md border border-border" />}
               <p className="text-xs text-muted-foreground mt-1">Or paste a URL:</p>
               <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" />
             </div>
 
-            {/* Ticket Types */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base">Ticket Types</Label>
@@ -281,22 +239,10 @@ const SellerDashboard = () => {
               </div>
               {ticketTypes.map((tt, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-end p-3 rounded-md border border-border bg-background">
-                  <div className="col-span-4">
-                    <Label className="text-xs">Name</Label>
-                    <Input value={tt.name} onChange={e => updateTicketType(i, 'name', e.target.value)} placeholder="VIP" />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Price ($)</Label>
-                    <Input type="number" step="0.01" value={tt.price} onChange={e => updateTicketType(i, 'price', e.target.value)} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Qty</Label>
-                    <Input type="number" value={tt.quantity} onChange={e => updateTicketType(i, 'quantity', e.target.value)} />
-                  </div>
-                  <div className="col-span-3">
-                    <Label className="text-xs">Description</Label>
-                    <Input value={tt.description} onChange={e => updateTicketType(i, 'description', e.target.value)} placeholder="Optional" />
-                  </div>
+                  <div className="col-span-4"><Label className="text-xs">Name</Label><Input value={tt.name} onChange={e => updateTicketType(i, 'name', e.target.value)} placeholder="VIP" /></div>
+                  <div className="col-span-2"><Label className="text-xs">Price (KSh)</Label><Input type="number" step="1" value={tt.price} onChange={e => updateTicketType(i, 'price', e.target.value)} /></div>
+                  <div className="col-span-2"><Label className="text-xs">Qty</Label><Input type="number" value={tt.quantity} onChange={e => updateTicketType(i, 'quantity', e.target.value)} /></div>
+                  <div className="col-span-3"><Label className="text-xs">Description</Label><Input value={tt.description} onChange={e => updateTicketType(i, 'description', e.target.value)} placeholder="Optional" /></div>
                   <div className="col-span-1">
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeTicketType(i)} disabled={ticketTypes.length <= 1}>
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -323,9 +269,7 @@ const SellerDashboard = () => {
           <div className="space-y-3 mb-8">
             {events.map(evt => (
               <div key={evt.id} className="rounded-lg border border-border bg-card p-4 flex flex-col sm:flex-row gap-4">
-                {evt.image_url && (
-                  <img src={evt.image_url} alt={evt.title} className="w-full sm:w-28 h-20 object-cover rounded-md" />
-                )}
+                {evt.image_url && <img src={evt.image_url} alt={evt.title} className="w-full sm:w-28 h-20 object-cover rounded-md" />}
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     {statusIcon(evt.status)}
@@ -335,8 +279,7 @@ const SellerDashboard = () => {
                   <p className="text-sm text-muted-foreground">{evt.venue}, {evt.location} · {new Date(evt.date).toLocaleDateString()}</p>
                   <p className="text-xs text-muted-foreground">
                     {(evt.ticket_types || []).length} ticket type{(evt.ticket_types || []).length !== 1 ? 's' : ''}
-                    {' · '}
-                    {(evt.ticket_types || []).reduce((s, t) => s + t.quantity_sold, 0)} sold
+                    {' · '}{(evt.ticket_types || []).reduce((s, t) => s + t.quantity_sold, 0)} sold
                   </p>
                 </div>
               </div>
@@ -348,7 +291,7 @@ const SellerDashboard = () => {
         <h2 className="text-xl font-heading font-bold mb-4">Recent Sales</h2>
         {orders.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground border border-border rounded-lg bg-card">
-            <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
             <p>No sales yet.</p>
           </div>
         ) : (
@@ -362,7 +305,7 @@ const SellerDashboard = () => {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-heading font-bold text-primary">${Number(order.total_amount).toFixed(2)}</p>
+                  <p className="font-heading font-bold text-primary">{formatCurrency(Number(order.total_amount))}</p>
                   <Badge variant="secondary" className="text-xs capitalize">{order.status}</Badge>
                 </div>
               </div>
