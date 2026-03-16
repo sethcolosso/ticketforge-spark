@@ -124,6 +124,8 @@ const Checkout = () => {
       if (error instanceof FunctionsHttpError) {
         const response = await error.context.json().catch(() => null);
         description = response?.error || description;
+      } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+        description = "Could not reach the M-Pesa service. Confirm Supabase Edge Functions are deployed and VITE_SUPABASE_URL is correct.";
       }
 
       toast({ title: "Checkout Failed", description, variant: "destructive" });
