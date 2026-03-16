@@ -71,3 +71,82 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## M-Pesa setup (STK Push)
+
+The `mpesa-stk-push` edge function requires **all** of these secrets for a real payment request:
+
+- `MPESA_CONSUMER_KEY`
+- `MPESA_CONSUMER_SECRET`
+- `MPESA_PASSKEY`
+- `MPESA_SHORTCODE`
+- Optional: `MPESA_ENV` (`sandbox` or `production`)
+
+Set them with Supabase CLI:
+
+```sh
+supabase secrets set MPESA_CONSUMER_KEY="..."
+supabase secrets set MPESA_CONSUMER_SECRET="..."
+supabase secrets set MPESA_PASSKEY="..."
+supabase secrets set MPESA_SHORTCODE="..."
+supabase secrets set MPESA_ENV="sandbox"
+```
+
+### If you only have consumer key + secret
+
+In `sandbox`, the function will auto-use Daraja test defaults (`174379` + sandbox passkey) if `MPESA_PASSKEY` / `MPESA_SHORTCODE` are missing. In `production`, you must set both values.
+
+- **Shortcode**: your assigned PayBill/Till number from Safaricom Daraja.
+- **Passkey**: generated for your Daraja app (Lipa Na M-Pesa Online).
+
+If sandbox defaults are unavailable or you are on production without these values, the function falls back to simulation mode (so checkout can continue) and marks the response as `simulated: true`.
+
+
+### Troubleshooting: "failed to send a request to Edge Function"
+
+If checkout cannot reach `mpesa-stk-push`, deploy functions and verify env values:
+
+```sh
+supabase functions deploy mpesa-stk-push
+supabase secrets list
+```
+
+For local dev, run:
+
+```sh
+supabase start
+supabase functions serve mpesa-stk-push --no-verify-jwt
+```
+
+Then ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` point to the same Supabase project where the function is deployed.
+
+
+## Paystack Lipa na M-Pesa setup
+
+Checkout now supports a Paystack-first Lipa na M-Pesa flow via the `paystack-mpesa-charge` edge function.
+
+You can run Paystack in either mode:
+
+1) **Client popup mode** (uses your public key in frontend):
+
+```sh
+# .env
+VITE_PAYSTACK_PUBLIC_KEY="pk_test_xxx"
+```
+
+2) **Edge function mode** (server-to-server):
+
+```sh
+supabase secrets set PAYSTACK_SECRET_KEY="<your_paystack_secret>"
+supabase secrets set PAYSTACK_ENV="test"
+```
+
+Deploy function (needed for edge function mode):
+
+```sh
+supabase functions deploy paystack-mpesa-charge
+```
+
+Notes:
+- Amount is sent in KES and converted to minor units (x100) before charge initiation.
+- If `PAYSTACK_SECRET_KEY` is not set, the function returns a simulated success so checkout demos can continue.
