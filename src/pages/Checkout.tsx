@@ -25,6 +25,7 @@ const Checkout = () => {
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -117,7 +118,7 @@ const Checkout = () => {
       setOrderId(order.id);
       setSubmitted(true);
       sessionStorage.removeItem("checkout");
-      toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the M-Pesa prompt." });
+      toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "Lipa na M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the Lipa na M-Pesa prompt." });
     } catch (error) {
       let description = error instanceof Error ? error.message : "Unable to complete.";
 
@@ -152,14 +153,14 @@ const Checkout = () => {
                 <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" required placeholder="Jane" /></div>
                 <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" required placeholder="Doe" /></div>
               </div>
-              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" /></div>
+              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             </div>
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-primary" /> M-Pesa Payment
+                <Smartphone className="h-4 w-4 text-primary" /> Lipa na M-Pesa (Paystack)
               </h2>
               <p className="text-sm text-muted-foreground">
-                Enter your M-Pesa registered phone number. You'll receive an STK push to confirm payment.
+                Enter your Paystack account email and M-Pesa phone number. You'll receive an STK push to confirm payment.
               </p>
               <div>
                 <Label htmlFor="phone">M-Pesa Phone Number</Label>
@@ -175,10 +176,10 @@ const Checkout = () => {
               </div>
             </div>
             <Button type="submit" size="lg" className="w-full text-base font-semibold" disabled={loading}>
-              {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via M-Pesa`}
+              {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via Lipa na M-Pesa`}
             </Button>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-              <Lock className="h-3 w-3" /> Secure checkout — powered by M-Pesa
+              <Lock className="h-3 w-3" /> Secure checkout — powered by Paystack Lipa na M-Pesa
             </p>
           </form>
           <div className="lg:col-span-2">
