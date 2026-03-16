@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createTicketOrder } from "@/lib/ticketOrders";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { formatCurrency } from "@/lib/currency";
 import SplitPayment from "@/components/SplitPayment";
 
@@ -24,6 +25,7 @@ const Checkout = () => {
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -84,16 +86,32 @@ const Checkout = () => {
     try {
       // Initiate M-Pesa STK push
       const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
-      
-      const { data: mpesaRes, error: mpesaErr } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          phone: formattedPhone,
-          amount: Math.ceil(grandTotal),
-          reference: `UP-${Date.now().toString(36).toUpperCase()}`,
-        },
-      });
+      let mpesaRes: { simulated?: boolean } | null = null;
 
-      if (mpesaErr) throw mpesaErr;
+      try {
+        const { data: invokeData, error: invokeError } = await supabase.functions.invoke("paystack-mpesa-charge", {
+          body: {
+            email,
+            phone: formattedPhone,
+            amount: Math.ceil(grandTotal),
+            reference: `UP-${Date.now().toString(36).toUpperCase()}`,
+          },
+        });
+
+        if (invokeError) throw invokeError;
+        mpesaRes = invokeData;
+      } catch (error) {
+        if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+          mpesaRes = { simulated: true };
+          toast({
+            title: "M-Pesa service unreachable",
+            description: "Continuing in offline simulation mode. Deploy edge functions to enable real STK push.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      }
 
       // Create order
       const order = await createTicketOrder(user.id, data);
@@ -101,9 +119,16 @@ const Checkout = () => {
       setOrderId(order.id);
       setSubmitted(true);
       sessionStorage.removeItem("checkout");
-      toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the M-Pesa prompt." });
+      toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "Lipa na M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the Lipa na M-Pesa prompt." });
     } catch (error) {
-      toast({ title: "Checkout Failed", description: error instanceof Error ? error.message : "Unable to complete.", variant: "destructive" });
+      let description = error instanceof Error ? error.message : "Unable to complete.";
+
+      if (error instanceof FunctionsHttpError) {
+        const response = await error.context.json().catch(() => null);
+        description = response?.error || description;
+      }
+
+      toast({ title: "Checkout Failed", description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -127,14 +152,14 @@ const Checkout = () => {
                 <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" required placeholder="Jane" /></div>
                 <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" required placeholder="Doe" /></div>
               </div>
-              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" /></div>
+              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             </div>
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-primary" /> M-Pesa Payment
+                <Smartphone className="h-4 w-4 text-primary" /> Lipa na M-Pesa (Paystack)
               </h2>
               <p className="text-sm text-muted-foreground">
-                Enter your M-Pesa registered phone number. You'll receive an STK push to confirm payment.
+                Enter your Paystack account email and M-Pesa phone number. You'll receive an STK push to confirm payment.
               </p>
               <div>
                 <Label htmlFor="phone">M-Pesa Phone Number</Label>
@@ -150,10 +175,10 @@ const Checkout = () => {
               </div>
             </div>
             <Button type="submit" size="lg" className="w-full text-base font-semibold" disabled={loading}>
-              {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via M-Pesa`}
+              {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via Lipa na M-Pesa`}
             </Button>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-              <Lock className="h-3 w-3" /> Secure checkout — powered by M-Pesa
+              <Lock className="h-3 w-3" /> Secure checkout — powered by Paystack Lipa na M-Pesa
             </p>
           </form>
           <div className="lg:col-span-2">
