@@ -18,6 +18,70 @@ interface CheckoutData {
   total: number;
 }
 
+
+type PaystackWindow = Window & {
+  PaystackPop?: {
+    setup?: (config: Record<string, unknown>) => { openIframe: () => void };
+    newTransaction?: (config: Record<string, unknown>) => void;
+  };
+};
+
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
+
+const loadPaystackInline = async () => {
+  const win = window as PaystackWindow;
+  if (win.PaystackPop) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load Paystack inline script"));
+    document.body.appendChild(script);
+  });
+};
+
+const startPaystackInlineCharge = async (email: string, phone: string, amount: number, reference: string) => {
+  await loadPaystackInline();
+  const win = window as PaystackWindow;
+
+  return new Promise<void>((resolve, reject) => {
+    if (!win.PaystackPop) {
+      reject(new Error("Paystack popup is unavailable"));
+      return;
+    }
+
+    const config = {
+      key: PAYSTACK_PUBLIC_KEY,
+      email,
+      amount: Math.ceil(amount * 100),
+      currency: "KES",
+      ref: reference,
+      channels: ["mobile_money"],
+      mobile_money: {
+        phone,
+        provider: "mpesa",
+      },
+      callback: () => resolve(),
+      onClose: () => reject(new Error("Payment window was closed")),
+    };
+
+    if (typeof win.PaystackPop.newTransaction === "function") {
+      win.PaystackPop.newTransaction(config);
+      return;
+    }
+
+    if (typeof win.PaystackPop.setup === "function") {
+      const handler = win.PaystackPop.setup(config);
+      handler.openIframe();
+      return;
+    }
+
+    reject(new Error("Paystack popup setup is unavailable"));
+  });
+};
+
 const Checkout = () => {
   const [data, setData] = useState<CheckoutData | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -60,7 +124,7 @@ const Checkout = () => {
         <h1 className="text-3xl font-heading font-bold mb-3">Order Confirmed!</h1>
         <p className="text-muted-foreground mb-2">Your tickets for <span className="text-foreground font-medium">{data.event.title}</span> have been reserved.</p>
         {orderCode && <p className="text-sm text-muted-foreground mb-4">Order ID: <span className="font-mono text-foreground">{orderCode}</span></p>}
-        
+
         {orderId && (
           <div className="mb-6">
             <SplitPayment orderId={orderId} totalAmount={data.total + data.total * 0.03} eventTitle={data.event.title} />
@@ -75,6 +139,9 @@ const Checkout = () => {
     );
   }
 
+  const fees = data.total * 0.03;
+  const grandTotal = data.total + fees;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) { navigate("/login"); return; }
@@ -82,9 +149,13 @@ const Checkout = () => {
       toast({ title: "Phone required", description: "Enter your M-Pesa phone number.", variant: "destructive" });
       return;
     }
+    if (!email) {
+      toast({ title: "Email required", description: "Enter your Paystack email.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Initiate M-Pesa STK push
       const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
       let mpesaRes: { simulated?: boolean } | null = null;
 
@@ -112,7 +183,6 @@ const Checkout = () => {
         }
       }
 
-      // Create order
       const order = await createTicketOrder(user.id, data);
       setOrderCode(order.order_code);
       setOrderId(order.id);
@@ -134,9 +204,6 @@ const Checkout = () => {
       setLoading(false);
     }
   };
-
-  const fees = data.total * 0.03;
-  const grandTotal = data.total + fees;
 
   return (
     <div className="py-8">

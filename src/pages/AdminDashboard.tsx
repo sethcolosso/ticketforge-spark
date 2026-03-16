@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, CheckCircle2, XCircle, Clock, Users, Package, DollarSign, Eye, Plus } from "lucide-react";
+import { Shield, Clock, Users, Package, DollarSign, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
@@ -13,13 +12,15 @@ import AdminEventList from "@/components/admin/AdminEventList";
 import AdminOrderList from "@/components/admin/AdminOrderList";
 import AdminUserManager from "@/components/admin/AdminUserManager";
 
+type AdminManagedEvent = DbEvent & { seller_is_seller?: boolean };
+
 const AdminDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: rolesLoading } = useRoles();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [events, setEvents] = useState<DbEvent[]>([]);
+  const [events, setEvents] = useState<AdminManagedEvent[]>([]);
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [userCount, setUserCount] = useState(0);
@@ -43,7 +44,21 @@ const AdminDashboard = () => {
       .from('events')
       .select('*, ticket_types(*)')
       .order('created_at', { ascending: false });
-    setEvents(evts || []);
+
+    const sellerIds = [...new Set((evts || []).map((e: DbEvent) => e.seller_id).filter(Boolean))];
+    const { data: sellerRoles } = await (supabase as any)
+      .from('user_roles')
+      .select('user_id, role')
+      .in('user_id', sellerIds.length > 0 ? sellerIds : ['00000000-0000-0000-0000-000000000000'])
+      .eq('role', 'seller');
+
+    const sellerIdSet = new Set((sellerRoles || []).map((r: { user_id: string }) => r.user_id));
+    const enrichedEvents: AdminManagedEvent[] = (evts || []).map((evt: DbEvent) => ({
+      ...evt,
+      seller_is_seller: sellerIdSet.has(evt.seller_id),
+    }));
+
+    setEvents(enrichedEvents);
 
     const { data: ords } = await (supabase as any)
       .from('orders')
@@ -85,6 +100,93 @@ const AdminDashboard = () => {
     fetchData();
   };
 
+  const handleEditPrices = async (event: AdminManagedEvent) => {
+    if (event.seller_is_seller) {
+      toast({
+        title: "Action blocked",
+        description: "Only non-seller events can be repriced from Admin Dashboard.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!event.ticket_types || event.ticket_types.length === 0) {
+      toast({ title: "No ticket types", description: "This event has no ticket types to reprice.", variant: "destructive" });
+      return;
+    }
+
+    for (const ticket of event.ticket_types) {
+      const input = window.prompt(`Set new price for ${ticket.name}`, String(ticket.price));
+      if (input === null) continue;
+      const price = Number(input);
+      if (!Number.isFinite(price) || price < 0) {
+        toast({ title: "Invalid price", description: `Skipped ${ticket.name}: enter a valid number.`, variant: "destructive" });
+        continue;
+      }
+
+      const { error } = await (supabase as any)
+        .from('ticket_types')
+        .update({ price })
+        .eq('id', ticket.id);
+
+      if (error) {
+        toast({ title: "Price update failed", description: error.message, variant: "destructive" });
+        return;
+      }
+    }
+
+    toast({ title: "Prices updated", description: `Updated ticket prices for ${event.title}.` });
+    fetchData();
+  };
+
+  const handleDeleteEvent = async (event: AdminManagedEvent) => {
+    if (event.seller_is_seller) {
+      toast({
+        title: "Action blocked",
+        description: "Only non-seller events can be deleted from Admin Dashboard.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete event \"${event.title}\"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const { count: orderCount, error: orderErr } = await (supabase as any)
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', event.id);
+
+    if (orderErr) {
+      toast({ title: "Delete blocked", description: orderErr.message, variant: "destructive" });
+      return;
+    }
+
+    if ((orderCount || 0) > 0) {
+      toast({
+        title: "Delete blocked",
+        description: "This event has orders. Cancel/refund orders first before deleting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error: ticketErr } = await (supabase as any).from('ticket_types').delete().eq('event_id', event.id);
+    if (ticketErr) {
+      toast({ title: "Delete failed", description: ticketErr.message, variant: "destructive" });
+      return;
+    }
+
+    const { error } = await (supabase as any).from('events').delete().eq('id', event.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Event deleted", description: `${event.title} was removed.` });
+    fetchData();
+  };
+
   const filteredEvents = tab === 'all' ? events : events.filter(e => e.status === tab);
   const pendingCount = events.filter(e => e.status === 'pending').length;
   const totalRevenue = orders.filter(o => o.status === 'confirmed').reduce((s, o) => s + Number(o.total_amount), 0);
@@ -114,7 +216,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total Users", value: userCount, icon: Users },
@@ -134,13 +235,9 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Admin Post Event Form */}
         {showForm && <AdminEventForm userId={user!.id} onSuccess={() => { setShowForm(false); fetchData(); }} />}
-
-        {/* User Management */}
         {showUsers && <AdminUserManager />}
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {(['pending', 'approved', 'rejected', 'all'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -158,6 +255,8 @@ const AdminDashboard = () => {
           onApprove={handleApprove}
           onReject={handleReject}
           onToggleFeatured={handleToggleFeatured}
+          onEditPrices={handleEditPrices}
+          onDeleteEvent={handleDeleteEvent}
         />
 
         <AdminOrderList orders={orders} />

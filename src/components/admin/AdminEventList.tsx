@@ -1,17 +1,21 @@
-import { CheckCircle2, XCircle, Eye } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, Trash2, BadgeDollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { DbEvent } from "@/types/database";
 
+type AdminManagedEvent = DbEvent & { seller_is_seller?: boolean };
+
 interface Props {
-  events: DbEvent[];
+  events: AdminManagedEvent[];
   tab: string;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onToggleFeatured: (id: string, current: boolean) => void;
+  onEditPrices: (event: AdminManagedEvent) => void;
+  onDeleteEvent: (event: AdminManagedEvent) => void;
 }
 
-const AdminEventList = ({ events, tab, onApprove, onReject, onToggleFeatured }: Props) => {
+const AdminEventList = ({ events, tab, onApprove, onReject, onToggleFeatured, onEditPrices, onDeleteEvent }: Props) => {
   if (events.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground border border-border rounded-lg bg-card mb-10">
@@ -33,12 +37,13 @@ const AdminEventList = ({ events, tab, onApprove, onReject, onToggleFeatured }: 
                 <h3 className="font-heading font-semibold">{evt.title}</h3>
                 <Badge variant="secondary" className="text-xs capitalize">{evt.status}</Badge>
                 {evt.is_featured && <Badge className="bg-primary text-primary-foreground text-xs">Featured</Badge>}
+                {evt.seller_is_seller === false && <Badge variant="outline" className="text-xs">Admin-managed</Badge>}
               </div>
               <p className="text-sm text-muted-foreground">{evt.venue}, {evt.location} · {new Date(evt.date).toLocaleDateString()}</p>
               <p className="text-xs text-muted-foreground">{evt.category} · {(evt.ticket_types || []).length} ticket types · Cap: {evt.capacity || '∞'}</p>
               {evt.description && <p className="text-xs text-muted-foreground line-clamp-2">{evt.description}</p>}
             </div>
-            <div className="flex items-start gap-2 flex-shrink-0">
+            <div className="flex items-start gap-2 flex-shrink-0 flex-wrap justify-end">
               {evt.status === 'pending' && (
                 <>
                   <Button size="sm" onClick={() => onApprove(evt.id)} className="gap-1"><CheckCircle2 className="h-4 w-4" /> Approve</Button>
@@ -48,6 +53,12 @@ const AdminEventList = ({ events, tab, onApprove, onReject, onToggleFeatured }: 
               {evt.status === 'rejected' && (
                 <Button size="sm" variant="outline" onClick={() => onApprove(evt.id)}>Approve</Button>
               )}
+              <Button size="sm" variant="outline" onClick={() => onEditPrices(evt)} className="gap-1" title="Update ticket prices">
+                <BadgeDollarSign className="h-4 w-4" /> Edit Prices
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => onDeleteEvent(evt)} className="gap-1" title="Delete event">
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => onToggleFeatured(evt.id, evt.is_featured)}
                 title={evt.is_featured ? 'Remove featured' : 'Mark as featured'}>
                 <Eye className="h-4 w-4" />
