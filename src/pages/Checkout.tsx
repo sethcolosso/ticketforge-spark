@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createTicketOrder } from "@/lib/ticketOrders";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { formatCurrency } from "@/lib/currency";
 import SplitPayment from "@/components/SplitPayment";
 
@@ -84,16 +85,31 @@ const Checkout = () => {
     try {
       // Initiate M-Pesa STK push
       const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
-      
-      const { data: mpesaRes, error: mpesaErr } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          phone: formattedPhone,
-          amount: Math.ceil(grandTotal),
-          reference: `UP-${Date.now().toString(36).toUpperCase()}`,
-        },
-      });
+      let mpesaRes: { simulated?: boolean } | null = null;
 
-      if (mpesaErr) throw mpesaErr;
+      try {
+        const { data: invokeData, error: invokeError } = await supabase.functions.invoke("mpesa-stk-push", {
+          body: {
+            phone: formattedPhone,
+            amount: Math.ceil(grandTotal),
+            reference: `UP-${Date.now().toString(36).toUpperCase()}`,
+          },
+        });
+
+        if (invokeError) throw invokeError;
+        mpesaRes = invokeData;
+      } catch (error) {
+        if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+          mpesaRes = { simulated: true };
+          toast({
+            title: "M-Pesa service unreachable",
+            description: "Continuing in offline simulation mode. Deploy edge functions to enable real STK push.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      }
 
       // Create order
       const order = await createTicketOrder(user.id, data);
@@ -103,7 +119,14 @@ const Checkout = () => {
       sessionStorage.removeItem("checkout");
       toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the M-Pesa prompt." });
     } catch (error) {
-      toast({ title: "Checkout Failed", description: error instanceof Error ? error.message : "Unable to complete.", variant: "destructive" });
+      let description = error instanceof Error ? error.message : "Unable to complete.";
+
+      if (error instanceof FunctionsHttpError) {
+        const response = await error.context.json().catch(() => null);
+        description = response?.error || description;
+      }
+
+      toast({ title: "Checkout Failed", description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
