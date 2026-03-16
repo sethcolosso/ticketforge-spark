@@ -26,6 +26,9 @@ serve(async (req) => {
     const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE");
     const MPESA_ENV = Deno.env.get("MPESA_ENV") || "sandbox";
 
+    const SANDBOX_DEFAULT_SHORTCODE = "174379";
+    const SANDBOX_DEFAULT_PASSKEY = "bfb279f9aa9bdbcf158e97ddf9f032f43fdd8f1b5f65e4f62d6f6f7f9f5eb7a6";
+
     const baseUrl = MPESA_ENV === "production"
       ? "https://api.safaricom.co.ke"
       : "https://sandbox.safaricom.co.ke";
@@ -83,7 +86,7 @@ serve(async (req) => {
       String(now.getHours()).padStart(2, "0") +
       String(now.getMinutes()).padStart(2, "0") +
       String(now.getSeconds()).padStart(2, "0");
-    const password = btoa(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`);
+    const password = btoa(`${resolvedShortcode}${resolvedPasskey}${timestamp}`);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
     const callbackUrl = `${SUPABASE_URL}/functions/v1/mpesa-callback`;
@@ -96,13 +99,13 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        BusinessShortCode: MPESA_SHORTCODE,
+        BusinessShortCode: resolvedShortcode,
         Password: password,
         Timestamp: timestamp,
         TransactionType: "CustomerPayBillOnline",
         Amount: Math.ceil(amount),
         PartyA: phone,
-        PartyB: MPESA_SHORTCODE,
+        PartyB: resolvedShortcode,
         PhoneNumber: phone,
         CallBackURL: callbackUrl,
         AccountReference: reference || "URBANPUNK",
