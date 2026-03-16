@@ -71,3 +71,32 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## M-Pesa setup (STK Push)
+
+The `mpesa-stk-push` edge function requires **all** of these secrets for a real payment request:
+
+- `MPESA_CONSUMER_KEY`
+- `MPESA_CONSUMER_SECRET`
+- `MPESA_PASSKEY`
+- `MPESA_SHORTCODE`
+- Optional: `MPESA_ENV` (`sandbox` or `production`)
+
+Set them with Supabase CLI:
+
+```sh
+supabase secrets set MPESA_CONSUMER_KEY="..."
+supabase secrets set MPESA_CONSUMER_SECRET="..."
+supabase secrets set MPESA_PASSKEY="..."
+supabase secrets set MPESA_SHORTCODE="..."
+supabase secrets set MPESA_ENV="sandbox"
+```
+
+### If you only have consumer key + secret
+
+You can get OAuth tokens, but STK Push will still fail without `MPESA_PASSKEY` and `MPESA_SHORTCODE`.
+
+- **Shortcode**: your assigned PayBill/Till number from Safaricom Daraja.
+- **Passkey**: generated for your Daraja app (Lipa Na M-Pesa Online).
+
+Without those two values, the function falls back to simulation mode (so checkout can continue) and marks the response as `simulated: true`.

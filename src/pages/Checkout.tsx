@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createTicketOrder } from "@/lib/ticketOrders";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { formatCurrency } from "@/lib/currency";
 import SplitPayment from "@/components/SplitPayment";
 
@@ -103,7 +104,16 @@ const Checkout = () => {
       sessionStorage.removeItem("checkout");
       toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the M-Pesa prompt." });
     } catch (error) {
-      toast({ title: "Checkout Failed", description: error instanceof Error ? error.message : "Unable to complete.", variant: "destructive" });
+      let description = error instanceof Error ? error.message : "Unable to complete.";
+
+      if (error instanceof FunctionsHttpError) {
+        const response = await error.context.json().catch(() => null);
+        description = response?.error || description;
+      } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+        description = "Could not reach the M-Pesa service. Confirm Supabase Edge Functions are deployed and VITE_SUPABASE_URL is correct.";
+      }
+
+      toast({ title: "Checkout Failed", description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
