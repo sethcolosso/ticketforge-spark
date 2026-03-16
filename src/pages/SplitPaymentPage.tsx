@@ -81,6 +81,8 @@ const SplitPaymentPage = () => {
       if (err instanceof FunctionsHttpError) {
         const response = await err.context.json().catch(() => null);
         description = response?.error || description;
+      } else if (err instanceof FunctionsFetchError || err instanceof FunctionsRelayError) {
+        description = "Could not reach the M-Pesa service. Confirm Supabase Edge Functions are deployed and environment variables are correct.";
       }
 
       toast({ title: "Payment failed", description, variant: "destructive" });

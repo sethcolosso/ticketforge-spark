@@ -51,41 +51,19 @@ serve(async (req) => {
       );
     }
 
-    const hasOAuthCredentials = Boolean(MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET);
-    const resolvedShortcode = MPESA_SHORTCODE || (MPESA_ENV === "sandbox" ? SANDBOX_DEFAULT_SHORTCODE : undefined);
-    const resolvedPasskey = MPESA_PASSKEY || (MPESA_ENV === "sandbox" ? SANDBOX_DEFAULT_PASSKEY : undefined);
-    const hasStkCredentials = Boolean(resolvedPasskey && resolvedShortcode);
+    const missingCredentials = [
+      !MPESA_CONSUMER_KEY ? "MPESA_CONSUMER_KEY" : null,
+      !MPESA_CONSUMER_SECRET ? "MPESA_CONSUMER_SECRET" : null,
+      !MPESA_PASSKEY ? "MPESA_PASSKEY" : null,
+      !MPESA_SHORTCODE ? "MPESA_SHORTCODE" : null,
+    ].filter(Boolean);
 
-    if (!hasOAuthCredentials) {
-      const missingOAuth = [
-        !MPESA_CONSUMER_KEY ? "MPESA_CONSUMER_KEY" : null,
-        !MPESA_CONSUMER_SECRET ? "MPESA_CONSUMER_SECRET" : null,
-      ].filter(Boolean);
-
+    if (missingCredentials.length > 0) {
       return new Response(
         JSON.stringify({
-          error: `M-Pesa configuration missing for OAuth. Missing: ${missingOAuth.join(", ")}.`,
+          error: `M-Pesa is partially configured. Missing: ${missingCredentials.join(", ")}. Set all required secrets to send real STK pushes.`,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // If STK-specific credentials are missing, fall back to simulation so checkout still works.
-    if (!hasStkCredentials) {
-      const missingStk = [
-        !resolvedPasskey ? "MPESA_PASSKEY" : null,
-        !resolvedShortcode ? "MPESA_SHORTCODE" : null,
-      ].filter(Boolean);
-
-      console.log(`[M-Pesa Simulation - Partial Config] STK Push to ${phone} for KSh ${amount}, ref: ${reference}. Missing: ${missingStk.join(", ")}`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          simulated: true,
-          message: `M-Pesa STK push simulated because ${missingStk.join(" and ")} ${missingStk.length > 1 ? "are" : "is"} not configured.`,
-          receipt: `SIM${Date.now().toString(36).toUpperCase()}`,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
