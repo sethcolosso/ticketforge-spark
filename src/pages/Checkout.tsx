@@ -85,16 +85,31 @@ const Checkout = () => {
     try {
       // Initiate M-Pesa STK push
       const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
-      
-      const { data: mpesaRes, error: mpesaErr } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          phone: formattedPhone,
-          amount: Math.ceil(grandTotal),
-          reference: `UP-${Date.now().toString(36).toUpperCase()}`,
-        },
-      });
+      let mpesaRes: { simulated?: boolean } | null = null;
 
-      if (mpesaErr) throw mpesaErr;
+      try {
+        const { data: invokeData, error: invokeError } = await supabase.functions.invoke("mpesa-stk-push", {
+          body: {
+            phone: formattedPhone,
+            amount: Math.ceil(grandTotal),
+            reference: `UP-${Date.now().toString(36).toUpperCase()}`,
+          },
+        });
+
+        if (invokeError) throw invokeError;
+        mpesaRes = invokeData;
+      } catch (error) {
+        if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+          mpesaRes = { simulated: true };
+          toast({
+            title: "M-Pesa service unreachable",
+            description: "Continuing in offline simulation mode. Deploy edge functions to enable real STK push.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      }
 
       // Create order
       const order = await createTicketOrder(user.id, data);

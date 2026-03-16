@@ -37,16 +37,31 @@ const SplitPaymentPage = () => {
     if (!user || !split || !phone) return;
     setPaying(true);
     try {
-      // Simulate M-Pesa STK push
-      const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          phone: phone.startsWith("0") ? `254${phone.slice(1)}` : phone,
-          amount: Math.ceil(split.total_amount / split.num_splits),
-          reference: split.share_code,
-        },
-      });
+      let mpesaRes: { receipt?: string; simulated?: boolean } | null = null;
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
+          body: {
+            phone: phone.startsWith("0") ? `254${phone.slice(1)}` : phone,
+            amount: Math.ceil(split.total_amount / split.num_splits),
+            reference: split.share_code,
+          },
+        });
+
+        if (error) throw error;
+        mpesaRes = data;
+      } catch (err) {
+        if (err instanceof FunctionsFetchError || err instanceof FunctionsRelayError) {
+          mpesaRes = { simulated: true, receipt: `SIM${Date.now().toString(36).toUpperCase()}` };
+          toast({
+            title: "M-Pesa service unreachable",
+            description: "Continuing in offline simulation mode. Deploy edge functions to enable real STK push.",
+            variant: "destructive",
+          });
+        } else {
+          throw err;
+        }
+      }
 
       // Record contribution
       await (supabase as any).from("split_payment_contributions").insert({
@@ -55,11 +70,11 @@ const SplitPaymentPage = () => {
         amount: split.total_amount / split.num_splits,
         status: "paid",
         phone_number: phone,
-        mpesa_receipt: data?.receipt || null,
+        mpesa_receipt: mpesaRes?.receipt || null,
       });
 
       setPaid(true);
-      toast({ title: "Payment sent!", description: "Your M-Pesa payment has been initiated." });
+      toast({ title: "Payment sent!", description: mpesaRes?.simulated ? "M-Pesa payment simulated." : "Your M-Pesa payment has been initiated." });
     } catch (err) {
       let description = err instanceof Error ? err.message : "Please try again.";
 
