@@ -23,15 +23,19 @@ serve(async (req) => {
     const MPESA_CONSUMER_KEY = Deno.env.get("MPESA_CONSUMER_KEY");
     const MPESA_CONSUMER_SECRET = Deno.env.get("MPESA_CONSUMER_SECRET");
     const MPESA_PASSKEY = Deno.env.get("MPESA_PASSKEY");
-    const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE") || "174379";
+    const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE");
     const MPESA_ENV = Deno.env.get("MPESA_ENV") || "sandbox";
 
     const baseUrl = MPESA_ENV === "production"
       ? "https://api.safaricom.co.ke"
       : "https://sandbox.safaricom.co.ke";
 
-    // If M-Pesa credentials aren't configured, simulate success
-    if (!MPESA_CONSUMER_KEY || !MPESA_CONSUMER_SECRET || !MPESA_PASSKEY) {
+    const hasAnyMpesaCredential = Boolean(
+      MPESA_CONSUMER_KEY || MPESA_CONSUMER_SECRET || MPESA_PASSKEY || MPESA_SHORTCODE,
+    );
+
+    // Keep simulation mode for demo environments where no M-Pesa credentials are configured.
+    if (!hasAnyMpesaCredential) {
       console.log(`[M-Pesa Simulation] STK Push to ${phone} for KSh ${amount}, ref: ${reference}`);
       return new Response(
         JSON.stringify({
@@ -41,6 +45,42 @@ serve(async (req) => {
           receipt: `SIM${Date.now().toString(36).toUpperCase()}`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const hasOAuthCredentials = Boolean(MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET);
+    const hasStkCredentials = Boolean(MPESA_PASSKEY && MPESA_SHORTCODE);
+
+    if (!hasOAuthCredentials) {
+      const missingOAuth = [
+        !MPESA_CONSUMER_KEY ? "MPESA_CONSUMER_KEY" : null,
+        !MPESA_CONSUMER_SECRET ? "MPESA_CONSUMER_SECRET" : null,
+      ].filter(Boolean);
+
+      return new Response(
+        JSON.stringify({
+          error: `M-Pesa configuration missing for OAuth. Missing: ${missingOAuth.join(", ")}.`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // If STK-specific credentials are missing, fall back to simulation so checkout still works.
+    if (!hasStkCredentials) {
+      const missingStk = [
+        !MPESA_PASSKEY ? "MPESA_PASSKEY" : null,
+        !MPESA_SHORTCODE ? "MPESA_SHORTCODE" : null,
+      ].filter(Boolean);
+
+      console.log(`[M-Pesa Simulation - Partial Config] STK Push to ${phone} for KSh ${amount}, ref: ${reference}. Missing: ${missingStk.join(", ")}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          simulated: true,
+          message: `M-Pesa STK push simulated because ${missingStk.join(" and ")} ${missingStk.length > 1 ? "are" : "is"} not configured.`,
+          receipt: `SIM${Date.now().toString(36).toUpperCase()}`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
