@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { formatCurrency } from "@/lib/currency";
 
 const SplitPaymentPage = () => {
@@ -60,7 +61,16 @@ const SplitPaymentPage = () => {
       setPaid(true);
       toast({ title: "Payment sent!", description: "Your M-Pesa payment has been initiated." });
     } catch (err) {
-      toast({ title: "Payment failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+      let description = err instanceof Error ? err.message : "Please try again.";
+
+      if (err instanceof FunctionsHttpError) {
+        const response = await err.context.json().catch(() => null);
+        description = response?.error || description;
+      } else if (err instanceof FunctionsFetchError || err instanceof FunctionsRelayError) {
+        description = "Could not reach the M-Pesa service. Confirm Supabase Edge Functions are deployed and environment variables are correct.";
+      }
+
+      toast({ title: "Payment failed", description, variant: "destructive" });
     }
     setPaying(false);
   };
