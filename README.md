@@ -99,23 +99,4 @@ You can get OAuth tokens, but STK Push will still fail without `MPESA_PASSKEY` a
 - **Shortcode**: your assigned PayBill/Till number from Safaricom Daraja.
 - **Passkey**: generated for your Daraja app (Lipa Na M-Pesa Online).
 
-Without those two values, the function falls back to simulation mode (so checkout can continue) and marks the response as `simulated: true`.
-
-
-### Troubleshooting: "failed to send a request to Edge Function"
-
-If checkout cannot reach `mpesa-stk-push`, deploy functions and verify env values:
-
-```sh
-supabase functions deploy mpesa-stk-push
-supabase secrets list
-```
-
-For local dev, run:
-
-```sh
-supabase start
-supabase functions serve mpesa-stk-push --no-verify-jwt
-```
-
-Then ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` point to the same Supabase project where the function is deployed.
+Without those two values, the function now returns a clear configuration error instead of pretending to complete a live transaction.
