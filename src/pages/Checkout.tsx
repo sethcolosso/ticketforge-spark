@@ -7,8 +7,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createTicketOrder } from "@/lib/ticketOrders";
-import { supabase } from "@/integrations/supabase/client";
-import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { formatCurrency } from "@/lib/currency";
 import SplitPayment from "@/components/SplitPayment";
 
@@ -17,7 +15,6 @@ interface CheckoutData {
   tickets: { ticket_type_id: string; name: string; price: number; quantity: number }[];
   total: number;
 }
-
 
 type PaystackWindow = Window & {
   PaystackPop?: {
@@ -42,7 +39,16 @@ const loadPaystackInline = async () => {
   });
 };
 
-const startPaystackInlineCharge = async (email: string, phone: string, amount: number, reference: string) => {
+const startPaystackInlineCharge = async (
+  email: string,
+  phone: string,
+  amount: number,
+  reference: string
+) => {
+  if (!PAYSTACK_PUBLIC_KEY) {
+    throw new Error("Paystack public key is missing. Please add VITE_PAYSTACK_PUBLIC_KEY to your .env file.");
+  }
+
   await loadPaystackInline();
   const win = window as PaystackWindow;
 
@@ -58,6 +64,7 @@ const startPaystackInlineCharge = async (email: string, phone: string, amount: n
       amount: Math.ceil(amount * 100),
       currency: "KES",
       ref: reference,
+      label: "Event Ticket Payment",
       channels: ["mobile_money"],
       mobile_money: {
         phone,
@@ -122,7 +129,9 @@ const Checkout = () => {
       <div className="container mx-auto px-4 py-20 text-center max-w-lg">
         <CheckCircle2 className="h-16 w-16 text-primary mx-auto mb-6" />
         <h1 className="text-3xl font-heading font-bold mb-3">Order Confirmed!</h1>
-        <p className="text-muted-foreground mb-2">Your tickets for <span className="text-foreground font-medium">{data.event.title}</span> have been reserved.</p>
+        <p className="text-muted-foreground mb-2">
+          Your tickets for <span className="text-foreground font-medium">{data.event.title}</span> have been reserved.
+        </p>
         {orderCode && <p className="text-sm text-muted-foreground mb-4">Order ID: <span className="font-mono text-foreground">{orderCode}</span></p>}
 
         {orderId && (
@@ -144,7 +153,10 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) { navigate("/login"); return; }
+    if (!user) {
+      navigate("/login");
+      return;
+    }
     if (!phone) {
       toast({ title: "Phone required", description: "Enter your M-Pesa phone number.", variant: "destructive" });
       return;
@@ -153,53 +165,44 @@ const Checkout = () => {
       toast({ title: "Email required", description: "Enter your Paystack email.", variant: "destructive" });
       return;
     }
+    if (!PAYSTACK_PUBLIC_KEY) {
+      toast({
+        title: "Configuration Error",
+        description: "Paystack public key is missing. Please add VITE_PAYSTACK_PUBLIC_KEY to your .env file and restart the dev server.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
-      let mpesaRes: { simulated?: boolean } | null = null;
+      const formattedPhone = phone.startsWith("0")
+        ? `254${phone.slice(1)}`
+        : phone.startsWith("+")
+        ? phone.slice(1)
+        : phone;
 
-      try {
-        const { data: invokeData, error: invokeError } = await supabase.functions.invoke("mpesa-stk-push", {
-          body: {
-            phone: formattedPhone,
-            amount: Math.ceil(grandTotal),
-            reference: `UP-${Date.now().toString(36).toUpperCase()}`,
-          },
-        });
+      const reference = "TICKET_" + Date.now();
 
-        if (invokeError) throw invokeError;
-        mpesaRes = invokeData;
-      } catch (error) {
-        if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
-          mpesaRes = { simulated: true };
-          toast({
-            title: "M-Pesa service unreachable",
-            description: "Continuing in offline simulation mode. Deploy edge functions to enable real STK push.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
-      }
+      // This triggers the exact same Paystack popup as your original script.js
+      await startPaystackInlineCharge(email, formattedPhone, grandTotal, reference);
 
+      // Payment was successful → create order
       const order = await createTicketOrder(user.id, data);
       setOrderCode(order.order_code);
       setOrderId(order.id);
       setSubmitted(true);
       sessionStorage.removeItem("checkout");
-      toast({ title: "Payment Initiated!", description: mpesaRes?.simulated ? "Lipa na M-Pesa payment simulated. Tickets confirmed." : "Check your phone for the Lipa na M-Pesa prompt." });
+
+      toast({ title: "Payment Successful!", description: "Your Lipa na M-Pesa payment was completed. Tickets confirmed." });
     } catch (error) {
-      let description = error instanceof Error ? error.message : "Unable to complete.";
-
-      if (error instanceof FunctionsHttpError) {
-        const response = await error.context.json().catch(() => null);
-        description = response?.error || description;
-      } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
-        description = "Could not reach the M-Pesa service. Confirm Supabase Edge Functions are deployed and VITE_SUPABASE_URL is correct.";
+      let description = "Payment could not be completed. Please try again.";
+      if (error instanceof Error) {
+        description = error.message.includes("closed")
+          ? "Payment was not completed. You can try again."
+          : error.message;
       }
-
-      toast({ title: "Checkout Failed", description, variant: "destructive" });
+      toast({ title: "Payment Failed", description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -222,12 +225,13 @@ const Checkout = () => {
               </div>
               <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             </div>
+
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold flex items-center gap-2">
                 <Smartphone className="h-4 w-4 text-primary" /> Lipa na M-Pesa (Paystack)
               </h2>
               <p className="text-sm text-muted-foreground">
-                Enter your Paystack account email and M-Pesa phone number. You'll receive an STK push to confirm payment.
+                Enter your email and M-Pesa phone number. A secure Paystack window will open (same as your working script.js).
               </p>
               <div>
                 <Label htmlFor="phone">M-Pesa Phone Number</Label>
@@ -242,13 +246,15 @@ const Checkout = () => {
                 <p className="text-xs text-muted-foreground mt-1">Format: 07XXXXXXXX or 254XXXXXXXXX</p>
               </div>
             </div>
+
             <Button type="submit" size="lg" className="w-full text-base font-semibold" disabled={loading}>
               {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via Lipa na M-Pesa`}
             </Button>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-              <Lock className="h-3 w-3" /> Secure checkout — powered by Paystack Lipa na M-Pesa
+              <Lock className="h-3 w-3" /> Secure checkout — powered by Paystack
             </p>
           </form>
+
           <div className="lg:col-span-2">
             <div className="sticky top-24 rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold">Order Summary</h2>

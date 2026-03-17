@@ -221,15 +221,30 @@ const AdminDashboard = () => {
             { label: "Total Users", value: userCount, icon: Users },
             { label: "Total Events", value: events.length, icon: Package },
             { label: "Pending Approval", value: pendingCount, icon: Clock },
-            { label: "Total Revenue", value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign },
+            { 
+              label: "Total Revenue", 
+              value: (
+                <div>
+                  <span className="text-2xl font-heading font-bold">KES {totalRevenue.toFixed(2)}</span>
+                  <p className="text-xs text-muted-foreground">KSh</p>
+                </div>
+              ), 
+              icon: DollarSign 
+            },
           ].map(stat => (
             <div key={stat.label} className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                 <stat.icon className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-heading font-bold">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                {typeof stat.value === 'number' || typeof stat.value === 'string' ? (
+                  <>
+                    <p className="text-2xl font-heading font-bold">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </>
+                ) : (
+                  stat.value
+                )}
               </div>
             </div>
           ))}

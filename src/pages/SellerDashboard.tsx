@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Package, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload, QrCode } from "lucide-react";
+import { Plus, Package, TrendingUp, Eye, Clock, CheckCircle2, XCircle, Trash2, Upload, QrCode, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ const SellerDashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<DbEvent | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
@@ -73,33 +74,67 @@ const SellerDashboard = () => {
     if (!user) return;
     setSubmitting(true);
 
-    const slug = generateSlug(title) + '-' + Date.now().toString(36);
-    const { data: evt, error } = await (supabase as any)
-      .from('events')
-      .insert({
-        seller_id: user.id, title, slug, description, date, time, venue, location, city, category,
-        capacity: capacity ? parseInt(capacity) : null,
-        image_url: imageUrl || null,
-      })
-      .select()
-      .single();
+    if (editingEvent) {
+      // Update existing event
+      const { error } = await (supabase as any)
+        .from('events')
+        .update({
+          title, description, date, time, venue, location, city, category,
+          capacity: capacity ? parseInt(capacity) : null,
+          image_url: imageUrl || null,
+        })
+        .eq('id', editingEvent.id);
 
-    if (error || !evt) {
-      toast({ title: "Error creating event", description: error?.message, variant: "destructive" });
-      setSubmitting(false);
-      return;
+      if (error) {
+        toast({ title: "Error updating event", description: error.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+
+      // Update ticket types: delete existing and insert new ones
+      await (supabase as any).from('ticket_types').delete().eq('event_id', editingEvent.id);
+
+      const tickets = ticketTypes.filter(t => t.name).map(t => ({
+        event_id: editingEvent.id, name: t.name, description: t.description || null,
+        price: parseFloat(t.price) || 0, quantity_available: parseInt(t.quantity) || 100,
+      }));
+
+      if (tickets.length > 0) {
+        await (supabase as any).from('ticket_types').insert(tickets);
+      }
+
+      toast({ title: "Event updated!", description: "Changes have been saved." });
+    } else {
+      // Create new event
+      const slug = generateSlug(title) + '-' + Date.now().toString(36);
+      const { data: evt, error } = await (supabase as any)
+        .from('events')
+        .insert({
+          seller_id: user.id, title, slug, description, date, time, venue, location, city, category,
+          capacity: capacity ? parseInt(capacity) : null,
+          image_url: imageUrl || null,
+        })
+        .select()
+        .single();
+
+      if (error || !evt) {
+        toast({ title: "Error creating event", description: error?.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+
+      const tickets = ticketTypes.filter(t => t.name).map(t => ({
+        event_id: evt.id, name: t.name, description: t.description || null,
+        price: parseFloat(t.price) || 0, quantity_available: parseInt(t.quantity) || 100,
+      }));
+
+      if (tickets.length > 0) {
+        await (supabase as any).from('ticket_types').insert(tickets);
+      }
+
+      toast({ title: "Event submitted!", description: "It will appear in listings once approved by admin." });
     }
 
-    const tickets = ticketTypes.filter(t => t.name).map(t => ({
-      event_id: evt.id, name: t.name, description: t.description || null,
-      price: parseFloat(t.price) || 0, quantity_available: parseInt(t.quantity) || 100,
-    }));
-
-    if (tickets.length > 0) {
-      await (supabase as any).from('ticket_types').insert(tickets);
-    }
-
-    toast({ title: "Event submitted!", description: "It will appear in listings once approved by admin." });
     setShowForm(false);
     resetForm();
     setSubmitting(false);
@@ -110,7 +145,29 @@ const SellerDashboard = () => {
     setTitle(""); setDescription(""); setDate(""); setTime(""); setVenue("");
     setLocation(""); setCity(""); setCategory("Music"); setCapacity(""); setImageUrl("");
     setTicketTypes([{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+    setEditingEvent(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const editEvent = (event: DbEvent) => {
+    setEditingEvent(event);
+    setTitle(event.title);
+    setDescription(event.description || "");
+    setDate(event.date);
+    setTime(event.time || "");
+    setVenue(event.venue);
+    setLocation(event.location);
+    setCity(event.city || "");
+    setCategory(event.category);
+    setCapacity(event.capacity?.toString() || "");
+    setImageUrl(event.image_url || "");
+    setTicketTypes(event.ticket_types?.map(tt => ({
+      name: tt.name,
+      price: tt.price.toString(),
+      quantity: tt.quantity_available.toString(),
+      description: tt.description || "",
+    })) || [{ name: "General Admission", price: "0", quantity: "100", description: "" }]);
+    setShowForm(true);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,7 +228,7 @@ const SellerDashboard = () => {
                 <QrCode className="h-4 w-4" /> QR Scanner
               </Button>
             </Link>
-            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+            <Button onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }} className="gap-2">
               <Plus className="h-4 w-4" /> {showForm ? "Cancel" : "Post New Event"}
             </Button>
           </div>
@@ -199,7 +256,7 @@ const SellerDashboard = () => {
         {/* New Event Form */}
         {showForm && (
           <form onSubmit={handleSubmitEvent} className="rounded-lg border border-border bg-card p-6 space-y-4 mb-8">
-            <h2 className="font-heading font-semibold text-lg">Create New Event</h2>
+            <h2 className="font-heading font-semibold text-lg">{editingEvent ? "Edit Event" : "Create New Event"}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div><Label>Event Title *</Label><Input value={title} onChange={e => setTitle(e.target.value)} required placeholder="Neon Nights Festival" /></div>
               <div>
@@ -253,7 +310,7 @@ const SellerDashboard = () => {
             </div>
 
             <Button type="submit" disabled={submitting} className="w-full">
-              {submitting ? "Submitting..." : "Submit Event for Approval"}
+              {submitting ? "Submitting..." : editingEvent ? "Update Event" : "Submit Event for Approval"}
             </Button>
           </form>
         )}
@@ -281,6 +338,11 @@ const SellerDashboard = () => {
                     {(evt.ticket_types || []).length} ticket type{(evt.ticket_types || []).length !== 1 ? 's' : ''}
                     {' · '}{(evt.ticket_types || []).reduce((s, t) => s + t.quantity_sold, 0)} sold
                   </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => editEvent(evt)} className="gap-1">
+                    <Edit className="h-3 w-3" /> Edit
+                  </Button>
                 </div>
               </div>
             ))}
