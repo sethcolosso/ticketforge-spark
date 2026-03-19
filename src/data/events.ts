@@ -1,6 +1,7 @@
-import event1 from "@/assets/event-1.png";
-import event2 from "@/assets/event-2.png";
-import event3 from "@/assets/event-3.png";
+import event1 from "@/assets/event1.jpg";
+import event2 from "@/assets/event2.jpg";
+import event3 from "@/assets/event3.jpg";
+import event4 from "@/assets/event4.jpg";
 
 export interface TicketType {
   id: string;
@@ -95,7 +96,7 @@ export const events: Event[] = [
     time: "8:00 PM",
     location: "Chicago, IL",
     venue: "Metro Chicago",
-    image: event1,
+    image: event4,
     description: "Featuring the hottest emerging hip-hop artists and producers.",
     longDescription: "Concrete Jungle brings together the next generation of hip-hop talent for an explosive night of raw lyricism and hard-hitting beats. Featuring 8 emerging artists, live producer battles, and freestyle sessions. This is where tomorrow's headliners are discovered today.",
     category: "Music",
