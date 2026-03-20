@@ -25,7 +25,7 @@ const Register = () => {
       password,
       options: {
         data: { first_name: firstName, last_name: lastName },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
     
@@ -44,8 +44,18 @@ const Register = () => {
     }
 
     setLoading(false);
-    toast({ title: "Account created!", description: "Welcome to URBANPUNK. Check your email to confirm." });
-    navigate("/dashboard");
+
+    if (signUpData.session) {
+      toast({ title: "Account created!", description: "Welcome to URBANPUNK." });
+      navigate("/dashboard");
+      return;
+    }
+
+    toast({
+      title: "Account created",
+      description: "Check your inbox/spam for a confirmation email before signing in.",
+    });
+    navigate("/login");
   };
 
   return (

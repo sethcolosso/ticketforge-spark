@@ -61,10 +61,12 @@ const SellerDashboard = () => {
 
     const { data: ords } = await (supabase as any)
       .from('orders')
-      .select('*, events!inner(*), order_items(*, ticket_types(*))')
-      .eq('events.seller_id', user!.id)
+      .select('*, events(id, title, date, venue, location, seller_id), order_items(*, ticket_types(*))')
       .order('created_at', { ascending: false });
-    setOrders(ords || []);
+    
+    // Filter orders by seller in application code
+    const sellerOrders = ords?.filter(o => o.events?.seller_id === user!.id) || [];
+    setOrders(sellerOrders);
   };
 
   const generateSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');

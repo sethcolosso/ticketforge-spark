@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import type { DbEvent } from "@/types/database";
 import EventCard from "@/components/EventCard";
 
@@ -21,17 +22,31 @@ const Events = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [recLoading, setRecLoading] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchEvents();
   }, []);
 
   const fetchEvents = async () => {
-    const { data } = await (supabase as any)
+    setLoading(true);
+    const { data, error } = await (supabase as any)
       .from('events')
       .select('*, ticket_types(*)')
       .eq('status', 'approved')
       .order('date', { ascending: true });
+
+    if (error) {
+      setEvents([]);
+      toast({
+        title: "Unable to load events",
+        description: error.message,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     setEvents(data || []);
     setLoading(false);
   };
@@ -51,13 +66,27 @@ const Events = () => {
           : 0,
       }));
 
-      const { data, error } = await supabase.functions.invoke('ai-recommend', {
+      let { data, error } = await supabase.functions.invoke('ai-recommend', {
         body: { events: eventsForAI, userQuery: search || undefined },
       });
+
+      // Fallback for projects where the function is deployed under a custom slug.
+      if (error?.message?.toLowerCase().includes('not found')) {
+        const fallback = await supabase.functions.invoke('smooth-endpoint', {
+          body: { events: eventsForAI, userQuery: search || undefined },
+        });
+        data = fallback.data;
+        error = fallback.error;
+      }
+
       if (error) throw error;
       if (data?.recommendations) setRecommendations(data.recommendations);
-    } catch {
-      // Silently fail for recommendations
+    } catch (error) {
+      toast({
+        title: "Unable to load recommendations",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
     }
     setRecLoading(false);
   };

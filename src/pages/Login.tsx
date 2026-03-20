@@ -13,6 +13,8 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -27,11 +29,39 @@ const Login = () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
+      const message = error.message.toLowerCase();
+      setShowResendConfirmation(message.includes("confirm") || message.includes("not confirmed"));
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else {
+      setShowResendConfirmation(false);
       toast({ title: "Welcome back!", description: "You have been logged in." });
       navigate("/dashboard");
     }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      toast({ title: "Email required", description: "Enter your email first.", variant: "destructive" });
+      return;
+    }
+
+    setResendingConfirmation(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/login` },
+    });
+    setResendingConfirmation(false);
+
+    if (error) {
+      toast({ title: "Resend failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({
+      title: "Confirmation sent",
+      description: "Check inbox/spam for the confirmation email.",
+    });
   };
 
   return (
@@ -61,6 +91,17 @@ const Login = () => {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </Button>
+          {showResendConfirmation && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={resendingConfirmation}
+              onClick={handleResendConfirmation}
+            >
+              {resendingConfirmation ? "Sending confirmation..." : "Resend confirmation email"}
+            </Button>
+          )}
         </form>
 
         <p className="text-sm text-center text-muted-foreground">

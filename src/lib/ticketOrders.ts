@@ -46,6 +46,71 @@ export interface TicketOrder {
   }[];
 }
 
+type OrderRow = {
+  id: string;
+  user_id: string;
+  event_id: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+};
+
+const hydrateOrders = async (orders: OrderRow[]): Promise<TicketOrder[]> => {
+  if (orders.length === 0) return [];
+
+  const eventIds = Array.from(new Set(orders.map((order) => order.event_id).filter(Boolean)));
+  const orderIds = orders.map((order) => order.id);
+
+  const [{ data: eventsData, error: eventsError }, { data: orderItemsData, error: orderItemsError }] = await Promise.all([
+    (supabase as any)
+      .from("events")
+      .select("id, title, slug, date, venue, location, image_url")
+      .in("id", eventIds),
+    (supabase as any)
+      .from("order_items")
+      .select("id, order_id, quantity, unit_price, ticket_types(name)")
+      .in("order_id", orderIds),
+  ]);
+
+  if (eventsError) {
+    throw new Error(eventsError.message);
+  }
+
+  if (orderItemsError) {
+    throw new Error(orderItemsError.message);
+  }
+
+  const eventsById = new Map<string, TicketOrder["events"]>();
+  (eventsData || []).forEach((event: any) => {
+    eventsById.set(event.id, {
+      title: event.title,
+      slug: event.slug,
+      date: event.date,
+      venue: event.venue,
+      location: event.location,
+      image_url: event.image_url,
+    });
+  });
+
+  const itemsByOrderId = new Map<string, TicketOrder["order_items"]>();
+  (orderItemsData || []).forEach((item: any) => {
+    const current = itemsByOrderId.get(item.order_id) || [];
+    current.push({
+      id: item.id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      ticket_types: item.ticket_types ? { name: item.ticket_types.name } : undefined,
+    });
+    itemsByOrderId.set(item.order_id, current);
+  });
+
+  return orders.map((order) => ({
+    ...order,
+    events: eventsById.get(order.event_id),
+    order_items: itemsByOrderId.get(order.id) || [],
+  }));
+};
+
 export const createTicketOrder = async (userId: string, payload: CheckoutOrderPayload) => {
   const ticketCount = payload.tickets.reduce((sum, item) => sum + item.quantity, 0);
   if (ticketCount === 0) {
@@ -95,7 +160,7 @@ export const createTicketOrder = async (userId: string, payload: CheckoutOrderPa
 export const fetchTicketOrdersForUser = async (userId: string): Promise<TicketOrder[]> => {
   const { data, error } = await (supabase as any)
     .from('orders')
-    .select('*, events(title, slug, date, venue, location, image_url), order_items(id, quantity, unit_price, ticket_types(name))')
+    .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -103,7 +168,7 @@ export const fetchTicketOrdersForUser = async (userId: string): Promise<TicketOr
     throw new Error(error.message);
   }
 
-  return data || [];
+  return hydrateOrders((data || []) as OrderRow[]);
 };
 
 export const isOrderCancelable = (order: TicketOrder) => {
@@ -123,12 +188,13 @@ export const cancelTicketOrder = async (order: TicketOrder, userId: string) => {
     .update({ status: 'cancelled' })
     .eq('id', order.id)
     .eq('user_id', userId)
-    .select('*, events(title, slug, date, venue, location, image_url), order_items(id, quantity, unit_price, ticket_types(name))')
+    .select('*')
     .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  const [hydrated] = await hydrateOrders([data as OrderRow]);
+  return hydrated;
 };

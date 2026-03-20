@@ -11,7 +11,40 @@ serve(async (req) => {
   try {
     const { events, userHistory, userQuery } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const eventPool = Array.isArray(events) ? events : [];
+
+    const fallbackRecommendations = () => {
+      const query = String(userQuery || "").toLowerCase().trim();
+      const scored = eventPool
+        .map((event: any) => {
+          const title = String(event?.title || "").toLowerCase();
+          const category = String(event?.category || "").toLowerCase();
+          const location = String(event?.location || "").toLowerCase();
+          const dateMs = Number.isFinite(new Date(event?.date).getTime()) ? new Date(event?.date).getTime() : Number.MAX_SAFE_INTEGER;
+          let score = 0;
+          if (!query) score += 1;
+          if (query && (title.includes(query) || category.includes(query) || location.includes(query))) score += 5;
+          if (event?.minPrice !== undefined && event?.minPrice !== null) score += 1;
+          return { event, score, dateMs };
+        })
+        .sort((a, b) => (b.score - a.score) || (a.dateMs - b.dateMs))
+        .slice(0, 3)
+        .map(({ event }: any) => ({
+          slug: event.slug,
+          reason: query
+            ? `Matches your interest in ${query}.`
+            : `Popular ${event.category || "event"} coming up soon.`,
+        }));
+
+      return new Response(JSON.stringify({ recommendations: scored, source: "fallback" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    };
+
+    if (!LOVABLE_API_KEY) {
+      console.warn("LOVABLE_API_KEY not configured. Returning fallback recommendations.");
+      return fallbackRecommendations();
+    }
 
     const eventList = (events || []).map((e: any) => 
       `- "${e.title}" (${e.category}, ${e.date}, ${e.location}, from $${e.minPrice})`
@@ -73,19 +106,9 @@ Only return the JSON array, nothing else.`;
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits depleted." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
       console.error("AI error:", response.status, t);
-      throw new Error("AI gateway error");
+      return fallbackRecommendations();
     }
 
     const result = await response.json();
