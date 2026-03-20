@@ -11,6 +11,7 @@ import AdminEventForm from "@/components/admin/AdminEventForm";
 import AdminEventList from "@/components/admin/AdminEventList";
 import AdminOrderList from "@/components/admin/AdminOrderList";
 import AdminUserManager from "@/components/admin/AdminUserManager";
+import RevenueTracker from "@/components/admin/RevenueTracker";
 
 type AdminManagedEvent = DbEvent & { seller_is_seller?: boolean };
 
@@ -249,6 +250,8 @@ const AdminDashboard = () => {
             </div>
           ))}
         </div>
+
+        <RevenueTracker />
 
         {showForm && <AdminEventForm userId={user!.id} onSuccess={() => { setShowForm(false); fetchData(); }} />}
         {showUsers && <AdminUserManager />}
