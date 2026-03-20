@@ -24,16 +24,3 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
--- Update the user_roles RLS policy to allow users to insert their own roles during registration
--- First, drop the problematic admin-only policy
-DROP POLICY IF EXISTS "Admins can manage roles" ON public.user_roles;
-
--- Add a policy that allows users to insert their own role during signup (via trigger)
--- Keep the view policy for users to see their own roles
-CREATE POLICY "System can manage roles" ON public.user_roles FOR ALL TO authenticated USING (
-  public.has_role(auth.uid(), 'admin')
-);
-
--- Add policy for the trigger to insert roles during signup
-CREATE POLICY "Service role can manage roles" ON public.user_roles FOR ALL USING (true);
