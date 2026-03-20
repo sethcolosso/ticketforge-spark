@@ -20,32 +20,30 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { data: signUpData, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { first_name: firstName, last_name: lastName },
-        emailRedirectTo: window.location.origin,
-      },
-    });
     
-    if (error) {
-      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
-    // If user chose seller role, add it
-    if (role === 'seller' && signUpData.user) {
-      await (supabase as any).from('user_roles').insert({
-        user_id: signUpData.user.id,
-        role: 'seller',
+    try {
+      const { data: signUpData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { first_name: firstName, last_name: lastName, role },
+          emailRedirectTo: window.location.origin,
+        },
       });
-    }
+      
+      if (error) {
+        toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
 
-    setLoading(false);
-    toast({ title: "Account created!", description: "Welcome to URBANPUNK. Check your email to confirm." });
-    navigate("/dashboard");
+      setLoading(false);
+      toast({ title: "Account created!", description: "Welcome to URBANPUNK. Check your email to confirm." });
+      navigate("/dashboard");
+    } catch (err: any) {
+      toast({ title: "Registration failed", description: err.message || "An error occurred", variant: "destructive" });
+      setLoading(false);
+    }
   };
 
   return (
