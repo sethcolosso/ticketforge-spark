@@ -42,6 +42,7 @@ type RevenueSegment = {
 };
 
 const DONUT_COLORS = ["#8b5cf6", "#a855f7", "#9333ea", "#c084fc", "#7c3aed", "#d8b4fe"];
+const TREND_PURPLE = "#a855f7";
 
 const PERIODS: Array<{ key: Period; label: string }> = [
   { key: "7d", label: "7 Days" },
@@ -300,8 +301,8 @@ const RevenueTracker = () => {
                     <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          <stop offset="5%" stopColor={TREND_PURPLE} stopOpacity={0.35} />
+                          <stop offset="95%" stopColor={TREND_PURPLE} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -314,7 +315,7 @@ const RevenueTracker = () => {
                         tickFormatter={(v) => `${Math.round(v / 1000)}k`}
                       />
                       <Tooltip content={<RevenueTooltip />} cursor={{ stroke: "hsl(var(--border))" }} />
-                      <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#revenueFill)" strokeWidth={2} dot={false} />
+                      <Area type="monotone" dataKey="revenue" stroke={TREND_PURPLE} fill="url(#revenueFill)" strokeWidth={2} dot={false} />
                     </AreaChart>
                   ) : (
                     <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -328,7 +329,7 @@ const RevenueTracker = () => {
                         tickFormatter={(v) => `${Math.round(v / 1000)}k`}
                       />
                       <Tooltip content={<RevenueTooltip />} cursor={{ fill: "hsl(var(--muted))" }} />
-                      <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[5, 5, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="revenue" fill={TREND_PURPLE} radius={[5, 5, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   )}
                 </ResponsiveContainer>
