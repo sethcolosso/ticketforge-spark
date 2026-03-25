@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import EventCard from "@/components/EventCard";
 import type { DbEvent } from "@/types/database";
-import heroBg from "@/assets/hero-bg.png";
+import urbanpunkVid from "@/assets/urbanpunkvid.mp4";
 
 const features = [
   { icon: Zap, title: "Lightning-Fast Setup", description: "Create and publish your event page in minutes, not days." },
@@ -34,8 +34,17 @@ const Index = () => {
     <div>
       {/* Hero Section */}
       <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden noise-overlay">
-        <img src={heroBg} alt="Urban concert scene" className="absolute inset-0 w-full h-full object-cover opacity-40" />
-        <div className="absolute inset-0 gradient-hero opacity-80" />
+        <video
+          className="absolute inset-0 w-full h-full object-cover opacity-80 brightness-125 contrast-110 saturate-110"
+          autoPlay
+          loop
+          muted
+          playsInline
+          aria-hidden="true"
+        >
+          <source src={urbanpunkVid} type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 gradient-hero opacity-40" />
         <div className="relative z-10 container mx-auto px-4 text-center">
           <p className="text-primary font-mono text-sm tracking-widest uppercase mb-4 animate-fade-in">Urban Punk The Future of Event Ticketing</p>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-bold leading-tight mb-6 animate-fade-in" style={{ animationDelay: "1.1s" }}>
