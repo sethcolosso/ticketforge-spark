@@ -106,6 +106,59 @@ export type Database = {
         }
         Relationships: []
       }
+      mpesa_payments: {
+        Row: {
+          amount: number
+          checkout_request_id: string | null
+          created_at: string
+          id: string
+          merchant_request_id: string | null
+          mpesa_receipt: string | null
+          order_id: string
+          phone: string
+          result_code: number | null
+          result_desc: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_request_id?: string | null
+          mpesa_receipt?: string | null
+          order_id: string
+          phone: string
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_request_id?: string | null
+          mpesa_receipt?: string | null
+          order_id?: string
+          phone?: string
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           id: string
@@ -402,7 +455,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "seller" | "buyer"
       event_status: "pending" | "approved" | "rejected"
-      order_status: "confirmed" | "cancelled" | "refunded"
+      order_status: "pending" | "confirmed" | "cancelled" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -532,7 +585,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "seller", "buyer"],
       event_status: ["pending", "approved", "rejected"],
-      order_status: ["confirmed", "cancelled", "refunded"],
+      order_status: ["pending", "confirmed", "cancelled", "refunded"],
     },
   },
 } as const
