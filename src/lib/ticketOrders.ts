@@ -111,7 +111,7 @@ const hydrateOrders = async (orders: OrderRow[]): Promise<TicketOrder[]> => {
   }));
 };
 
-export const createTicketOrder = async (userId: string, payload: CheckoutOrderPayload) => {
+export const createTicketOrder = async (userId: string | null, payload: CheckoutOrderPayload, guestEmail?: string) => {
   const ticketCount = payload.tickets.reduce((sum, item) => sum + item.quantity, 0);
   if (ticketCount === 0) {
     throw new Error("Select at least one ticket to place an order.");
