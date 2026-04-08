@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, CheckCircle2, Smartphone } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle2, Smartphone, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,85 +9,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { createTicketOrder } from "@/lib/ticketOrders";
 import { formatCurrency } from "@/lib/currency";
 import SplitPayment from "@/components/SplitPayment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CheckoutData {
   event: { id: string; slug: string; title: string; date: string; venue: string; location: string; image?: string };
   tickets: { ticket_type_id: string; name: string; price: number; quantity: number }[];
   total: number;
 }
-
-type PaystackWindow = Window & {
-  PaystackPop?: {
-    setup?: (config: Record<string, unknown>) => { openIframe: () => void };
-    newTransaction?: (config: Record<string, unknown>) => void;
-  };
-};
-
-const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
-
-const loadPaystackInline = async () => {
-  const win = window as PaystackWindow;
-  if (win.PaystackPop) return;
-
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://js.paystack.co/v1/inline.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Unable to load Paystack inline script"));
-    document.body.appendChild(script);
-  });
-};
-
-const startPaystackInlineCharge = async (
-  email: string,
-  phone: string,
-  amount: number,
-  reference: string
-) => {
-  if (!PAYSTACK_PUBLIC_KEY) {
-    throw new Error("Paystack public key is missing. Please add VITE_PAYSTACK_PUBLIC_KEY to your .env file.");
-  }
-
-  await loadPaystackInline();
-  const win = window as PaystackWindow;
-
-  return new Promise<void>((resolve, reject) => {
-    if (!win.PaystackPop) {
-      reject(new Error("Paystack popup is unavailable"));
-      return;
-    }
-
-    const config = {
-      key: PAYSTACK_PUBLIC_KEY,
-      email,
-      amount: Math.ceil(amount * 100),
-      currency: "KES",
-      ref: reference,
-      label: "Event Ticket Payment",
-      channels: ["mobile_money"],
-      mobile_money: {
-        phone,
-        provider: "mpesa",
-      },
-      callback: () => resolve(),
-      onClose: () => reject(new Error("Payment window was closed")),
-    };
-
-    if (typeof win.PaystackPop.newTransaction === "function") {
-      win.PaystackPop.newTransaction(config);
-      return;
-    }
-
-    if (typeof win.PaystackPop.setup === "function") {
-      const handler = win.PaystackPop.setup(config);
-      handler.openIframe();
-      return;
-    }
-
-    reject(new Error("Paystack popup setup is unavailable"));
-  });
-};
 
 const Checkout = () => {
   const [data, setData] = useState<CheckoutData | null>(null);
@@ -96,7 +24,6 @@ const Checkout = () => {
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -153,24 +80,9 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+    if (!user) { navigate("/login"); return; }
     if (!phone) {
       toast({ title: "Phone required", description: "Enter your M-Pesa phone number.", variant: "destructive" });
-      return;
-    }
-    if (!email) {
-      toast({ title: "Email required", description: "Enter your Paystack email.", variant: "destructive" });
-      return;
-    }
-    if (!PAYSTACK_PUBLIC_KEY) {
-      toast({
-        title: "Configuration Error",
-        description: "Paystack public key is missing. Please add VITE_PAYSTACK_PUBLIC_KEY to your .env file and restart the dev server.",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -182,26 +94,42 @@ const Checkout = () => {
         ? phone.slice(1)
         : phone;
 
-      const reference = "TICKET_" + Date.now();
+      const reference = "URBANPUNK_" + Date.now();
 
-      // This triggers the exact same Paystack popup as your original script.js
-      await startPaystackInlineCharge(email, formattedPhone, grandTotal, reference);
+      // Trigger M-Pesa STK Push
+      const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
+        body: { phone: formattedPhone, amount: Math.ceil(grandTotal), reference },
+      });
 
-      // Payment was successful → create order
+      if (stkError) throw new Error(stkError.message || "Failed to initiate M-Pesa payment");
+      if (!stkResponse?.success) throw new Error(stkResponse?.error || "M-Pesa STK Push failed");
+
+      toast({
+        title: "M-Pesa Prompt Sent!",
+        description: "Check your phone and enter your M-Pesa PIN to complete payment.",
+      });
+
+      // Create order (confirmed) after STK push is sent
       const order = await createTicketOrder(user.id, data);
       setOrderCode(order.order_code);
       setOrderId(order.id);
+
+      // Record M-Pesa payment for callback tracking
+      await (supabase as any).from("mpesa_payments").insert({
+        order_id: order.id,
+        phone: formattedPhone,
+        amount: Math.ceil(grandTotal),
+        checkout_request_id: stkResponse.CheckoutRequestID || null,
+        merchant_request_id: stkResponse.MerchantRequestID || null,
+        status: "pending",
+      });
+
       setSubmitted(true);
       sessionStorage.removeItem("checkout");
 
-      toast({ title: "Payment Successful!", description: "Your Lipa na M-Pesa payment was completed. Tickets confirmed." });
+      toast({ title: "Payment Initiated!", description: "Complete the M-Pesa prompt on your phone. Your tickets are reserved." });
     } catch (error) {
-      let description = "Payment could not be completed. Please try again.";
-      if (error instanceof Error) {
-        description = error.message.includes("closed")
-          ? "Payment was not completed. You can try again."
-          : error.message;
-      }
+      const description = error instanceof Error ? error.message : "Payment could not be completed. Please try again.";
       toast({ title: "Payment Failed", description, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -223,15 +151,15 @@ const Checkout = () => {
                 <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" required placeholder="Jane" /></div>
                 <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" required placeholder="Doe" /></div>
               </div>
-              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" /></div>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-primary" /> Lipa na M-Pesa (Paystack)
+                <Smartphone className="h-4 w-4 text-primary" /> Lipa na M-Pesa
               </h2>
               <p className="text-sm text-muted-foreground">
-                Enter your email and M-Pesa phone number. A secure Paystack window will open (same as your working script.js).
+                Enter your Safaricom M-Pesa number. You'll receive an STK push prompt on your phone to complete the payment.
               </p>
               <div>
                 <Label htmlFor="phone">M-Pesa Phone Number</Label>
@@ -248,10 +176,14 @@ const Checkout = () => {
             </div>
 
             <Button type="submit" size="lg" className="w-full text-base font-semibold" disabled={loading}>
-              {loading ? "Processing..." : `Pay ${formatCurrency(grandTotal)} via Lipa na M-Pesa`}
+              {loading ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Sending STK Push...</span>
+              ) : (
+                `Pay ${formatCurrency(grandTotal)} via Lipa na M-Pesa`
+              )}
             </Button>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-              <Lock className="h-3 w-3" /> Secure checkout — powered by Paystack
+              <Lock className="h-3 w-3" /> Secure checkout — powered by Safaricom M-Pesa
             </p>
           </form>
 

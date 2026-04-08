@@ -40,16 +40,18 @@ const SplitPaymentPage = () => {
       let mpesaRes: { receipt?: string; simulated?: boolean } | null = null;
 
       try {
+        const formattedPhone = phone.startsWith("0") ? `254${phone.slice(1)}` : phone.startsWith("+") ? phone.slice(1) : phone;
         const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
           body: {
-            phone: phone.startsWith("0") ? `254${phone.slice(1)}` : phone,
+            phone: formattedPhone,
             amount: Math.ceil(split.total_amount / split.num_splits),
-            reference: split.share_code,
+            reference: `SPLIT_${split.share_code}`,
           },
         });
 
         if (error) throw error;
-        mpesaRes = data;
+        if (!data?.success) throw new Error(data?.error || "STK Push failed");
+        mpesaRes = { receipt: data.CheckoutRequestID, simulated: false };
       } catch (err) {
         if (err instanceof FunctionsFetchError || err instanceof FunctionsRelayError) {
           mpesaRes = { simulated: true, receipt: `SIM${Date.now().toString(36).toUpperCase()}` };
