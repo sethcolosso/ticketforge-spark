@@ -22,9 +22,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
         setLoading(false);
+
+        // Link guest orders on login/signup
+        if (session?.user?.email && (_event === 'SIGNED_IN' || _event === 'USER_UPDATED')) {
+          await (supabase as any)
+            .from('orders')
+            .update({ user_id: session.user.id })
+            .eq('guest_email', session.user.email)
+            .is('user_id', null);
+        }
       }
     );
 

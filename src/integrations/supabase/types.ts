@@ -202,32 +202,35 @@ export type Database = {
         Row: {
           created_at: string
           event_id: string
+          guest_email: string | null
           id: string
           qr_code: string | null
           scanned_at: string | null
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           event_id: string
+          guest_email?: string | null
           id?: string
           qr_code?: string | null
           scanned_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount: number
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           event_id?: string
+          guest_email?: string | null
           id?: string
           qr_code?: string | null
           scanned_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

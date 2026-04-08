@@ -24,8 +24,11 @@ const Checkout = () => {
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,14 +36,10 @@ const Checkout = () => {
     if (raw) setData(JSON.parse(raw));
   }, []);
 
+  // Pre-fill email if logged in
   useEffect(() => {
-    if (!authLoading && !user) {
-      toast({ title: "Login Required", description: "Please sign in to complete your purchase." });
-      navigate("/login");
-    }
-  }, [authLoading, user, navigate, toast]);
-
-  if (authLoading) return <div className="py-24 text-center text-muted-foreground">Loading checkout...</div>;
+    if (user?.email) setEmail(user.email);
+  }, [user]);
 
   if (!data) {
     return (
@@ -61,6 +60,12 @@ const Checkout = () => {
         </p>
         {orderCode && <p className="text-sm text-muted-foreground mb-4">Order ID: <span className="font-mono text-foreground">{orderCode}</span></p>}
 
+        {!user && (
+          <p className="text-sm text-muted-foreground mb-4">
+            Sign up with <span className="font-medium text-foreground">{email}</span> to view your tickets anytime in your dashboard.
+          </p>
+        )}
+
         {orderId && (
           <div className="mb-6">
             <SplitPayment orderId={orderId} totalAmount={data.total + data.total * 0.03} eventTitle={data.event.title} />
@@ -68,7 +73,11 @@ const Checkout = () => {
         )}
 
         <div className="flex gap-4 justify-center">
-          <Link to="/dashboard"><Button>View My Tickets</Button></Link>
+          {user ? (
+            <Link to="/dashboard"><Button>View My Tickets</Button></Link>
+          ) : (
+            <Link to="/register"><Button>Sign Up to Track Orders</Button></Link>
+          )}
           <Link to="/events"><Button variant="outline">Browse More Events</Button></Link>
         </div>
       </div>
@@ -80,9 +89,12 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) { navigate("/login"); return; }
     if (!phone) {
       toast({ title: "Phone required", description: "Enter your M-Pesa phone number.", variant: "destructive" });
+      return;
+    }
+    if (!email) {
+      toast({ title: "Email required", description: "Enter your email address.", variant: "destructive" });
       return;
     }
 
@@ -96,7 +108,6 @@ const Checkout = () => {
 
       const reference = "URBANPUNK_" + Date.now();
 
-      // Trigger M-Pesa STK Push
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
         body: { phone: formattedPhone, amount: Math.ceil(grandTotal), reference },
       });
@@ -109,12 +120,11 @@ const Checkout = () => {
         description: "Check your phone and enter your M-Pesa PIN to complete payment.",
       });
 
-      // Create order (confirmed) after STK push is sent
-      const order = await createTicketOrder(user.id, data);
+      // Create order - pass userId if logged in, otherwise guest email
+      const order = await createTicketOrder(user?.id || null, data, email);
       setOrderCode(order.order_code);
       setOrderId(order.id);
 
-      // Record M-Pesa payment for callback tracking
       await (supabase as any).from("mpesa_payments").insert({
         order_id: order.id,
         phone: formattedPhone,
@@ -148,10 +158,14 @@ const Checkout = () => {
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-heading font-semibold">Contact Information</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" required placeholder="Jane" /></div>
-                <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" required placeholder="Doe" /></div>
+                <div><Label htmlFor="firstName">First Name</Label><Input id="firstName" required placeholder="Jane" value={firstName} onChange={e => setFirstName(e.target.value)} /></div>
+                <div><Label htmlFor="lastName">Last Name</Label><Input id="lastName" required placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} /></div>
               </div>
-              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required placeholder="jane@example.com" /></div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" required placeholder="jane@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                {!user && <p className="text-xs text-muted-foreground mt-1">If you sign up later with this email, your tickets will appear in your dashboard.</p>}
+              </div>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
@@ -163,14 +177,7 @@ const Checkout = () => {
               </p>
               <div>
                 <Label htmlFor="phone">M-Pesa Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  required
-                  placeholder="0712345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <Input id="phone" type="tel" required placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 <p className="text-xs text-muted-foreground mt-1">Format: 07XXXXXXXX or 254XXXXXXXXX</p>
               </div>
             </div>

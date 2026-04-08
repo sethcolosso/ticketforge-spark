@@ -111,7 +111,7 @@ const hydrateOrders = async (orders: OrderRow[]): Promise<TicketOrder[]> => {
   }));
 };
 
-export const createTicketOrder = async (userId: string, payload: CheckoutOrderPayload) => {
+export const createTicketOrder = async (userId: string | null, payload: CheckoutOrderPayload, guestEmail?: string) => {
   const ticketCount = payload.tickets.reduce((sum, item) => sum + item.quantity, 0);
   if (ticketCount === 0) {
     throw new Error("Select at least one ticket to place an order.");
@@ -120,14 +120,21 @@ export const createTicketOrder = async (userId: string, payload: CheckoutOrderPa
   const total = Number(payload.total.toFixed(2));
 
   // Create order
+  const orderData: any = {
+    event_id: payload.event.id,
+    total_amount: total,
+    status: 'confirmed',
+  };
+  if (userId) {
+    orderData.user_id = userId;
+  }
+  if (guestEmail) {
+    orderData.guest_email = guestEmail;
+  }
+
   const { data: order, error: orderError } = await (supabase as any)
     .from('orders')
-    .insert({
-      user_id: userId,
-      event_id: payload.event.id,
-      total_amount: total,
-      status: 'confirmed',
-    })
+    .insert(orderData)
     .select()
     .single();
 
