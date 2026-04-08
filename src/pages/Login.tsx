@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Ticket } from "lucide-react";
+import urbanpunkLogo from "@/assets/urbanpunk-logo.jpeg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,8 +68,8 @@ const Login = () => {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center gap-2 text-primary font-heading font-bold text-2xl mb-4">
-            <Ticket className="h-7 w-7" />
+          <Link to="/" className="inline-flex items-center gap-2 font-heading font-bold text-2xl mb-4">
+            <img src={urbanpunkLogo} alt="URBANPUNK" className="h-10 w-auto rounded" />
             URBANPUNK
           </Link>
           <h1 className="text-2xl font-heading font-bold mt-4">Welcome back</h1>

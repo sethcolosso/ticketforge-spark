@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Instagram, Linkedin, Ticket, Twitter } from "lucide-react";
+import { Instagram, Linkedin, Twitter } from "lucide-react";
+import urbanpunkLogo from "@/assets/urbanpunk-logo.jpeg";
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg
@@ -22,8 +23,8 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {/* Brand */}
         <div className="md:col-span-1">
-          <Link to="/" className="flex items-center gap-2 text-primary font-heading font-bold text-lg mb-3">
-            <Ticket className="h-5 w-5" />
+          <Link to="/" className="flex items-center gap-2 font-heading font-bold text-lg mb-3">
+            <img src={urbanpunkLogo} alt="URBANPUNK" className="h-7 w-auto rounded" />
             URBANPUNK
           </Link>
           <p className="text-sm text-muted-foreground">
