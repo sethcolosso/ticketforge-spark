@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import EventCard from "@/components/EventCard";
 import type { DbEvent } from "@/types/database";
 import urbanpunkVid from "@/assets/urbanpunkvid.mp4";
+import urbanpunkLogo from "@/assets/urbanpunk-logo.jpeg";
 
 const features = [
   { icon: Zap, title: "Lightning-Fast Setup", description: "Create and publish your event page in minutes, not days." },
@@ -46,7 +47,8 @@ const Index = () => {
         </video>
         <div className="absolute inset-0 gradient-hero opacity-40" />
         <div className="relative z-10 container mx-auto px-4 text-center">
-          <p className="text-primary font-mono text-sm tracking-widest uppercase mb-4 animate-fade-in">Urban Punk The Future of Event Ticketing</p>
+          <img src={urbanpunkLogo} alt="URBANPUNK" className="h-20 w-auto mx-auto mb-6 animate-fade-in rounded-lg" />
+          <p className="text-primary font-mono text-sm tracking-widest uppercase mb-4 animate-fade-in">The Future of Event Ticketing</p>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-bold leading-tight mb-6 animate-fade-in" style={{ animationDelay: "1.1s" }}>
             Sell Tickets.{""}
             <span className="text-glow text-gray-500">Buy Tickets.{" "}</span>

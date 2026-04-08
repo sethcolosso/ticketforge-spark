@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, Ticket, User, Store, Shield } from "lucide-react";
+import { Menu, X, User, Store, Shield } from "lucide-react";
+import urbanpunkLogo from "@/assets/urbanpunk-logo.jpeg";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
@@ -20,9 +21,9 @@ const Navbar = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <nav className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2 text-primary font-heading font-bold text-xl">
-          <Ticket className="h-6 w-6" />
-          <span>URBANPUNK</span>
+        <Link to="/" className="flex items-center gap-2 font-heading font-bold text-xl">
+          <img src={urbanpunkLogo} alt="URBANPUNK" className="h-8 w-auto rounded" />
+          <span className="text-foreground">URBANPUNK</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
