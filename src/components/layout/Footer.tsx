@@ -61,7 +61,16 @@ const Footer = () => (
 
       <div className="mt-10 pt-6 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-xs text-muted-foreground text-center md:text-left">
-          &copy; 2026 URBANPUNK. All rights reserved. Designed by SethColosso and Timo.
+          &copy; 2026 URBANPUNK. All rights reserved. Designed by SethColosso and{' '}
+          <a
+            href="https://codeknighttim.github.io/myportfolio/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            Timo
+          </a>
+          .
         </p>
         <div className="flex items-center gap-3">
           <a href="#" aria-label="Instagram" className="text-muted-foreground hover:text-primary transition-colors">
